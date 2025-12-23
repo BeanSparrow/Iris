@@ -39,7 +39,7 @@ class DatabaseManager:
             self.initialize_database()
     
     def _find_project_root(self) -> Path:
-        """Find project root by looking for project markers or detecting IRIS structure"""
+        """Find project root by looking for .claude directory (IRIS installation marker)"""
         current = Path.cwd()
 
         # First, check if we're running from inside .claude/commands/iris/utils
@@ -52,10 +52,10 @@ class DatabaseManager:
                 project_root = Path(parts[0].rstrip("/\\"))
                 return project_root
 
-        # Second, look for definitive project markers (.git or .iris)
+        # Second, look for .claude directory (IRIS installation = project root)
         check = current
         while check != check.parent:
-            if (check / ".git").exists() or (check / ".iris").exists():
+            if (check / ".claude").exists():
                 return check
             check = check.parent
 
