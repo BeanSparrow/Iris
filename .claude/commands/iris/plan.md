@@ -450,10 +450,6 @@ Tasks are created with complexity-appropriate settings:
    - Research methodology and caching notes
    - Complexity-appropriate tool selections
 
-5) **`enhancements` table**
-   - Feature additions and modifications
-   - Impact assessments and complexity tracking
-
 ## Adaptive Quality Gates
 
 **Complexity-Based Quality Requirements:**
@@ -492,7 +488,7 @@ esac
 ### 📊 Adaptive Scope Protection  
 - **MVP Features:** [ACTUAL_MVP_COUNT] of [TOTAL_FEATURES_ANALYZED] ([ADAPTIVE_LIMIT] limit applied)
 - **Feature Scaling:** [SCALING_REASON] 
-- **Deferred Features:** [ACTUAL_DEFERRED_COUNT] (tracked in database enhancements table)
+- **Deferred Features:** [ACTUAL_DEFERRED_COUNT] (tracked in deferred_features table)
 
 ### 🚀 Adaptive Research Execution
 - **Research Strategy:** [SKIP/CACHED/FULL] based on complexity
@@ -512,9 +508,8 @@ esac
   - **milestones table** - [ACTUAL_MILESTONE_COUNT] adaptive milestones with sizing strategy
   - **tasks table** - [ACTUAL_TASK_COUNT] tasks with adaptive metadata and scope boundaries
   - **technologies table** - [CACHED_COUNT] cached + [RESEARCHED_COUNT] researched technologies
-  - **enhancements table** - Feature additions and impact tracking
   - **task_dependencies table** - Task relationship mapping
-- **PROJECT_STATUS.md** - Auto-generated status summary (from Status Translator)
+- **PROJECT_STATUS.md** - Auto-generated status summary
 - **backups/** - Automatic database backups with versioning
 
 ### 🛡️ Adaptive Protection Metrics
@@ -541,8 +536,7 @@ The adaptive planner integrates seamlessly with all Iris commands:
 
 - **`/iris:execute`** automatically reads database configuration and adaptive settings
 - **`/iris:validate`** applies complexity-appropriate validation from database rules
-- **`/iris:enhance`** respects adaptive feature limits stored in database
-- **`/iris:security`** provides essential security analysis using database state
+- **`/iris:audit`** provides essential security analysis using database state
 
 ## Command Examples
 

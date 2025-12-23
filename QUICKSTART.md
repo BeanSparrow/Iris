@@ -99,12 +99,6 @@ export CLAUDE_DANGEROUS_MODE=true
 claude --dangerously-skip-permissions
 ```
 
-### View Setup Instructions
-```bash
-cd .claude/commands/iris/utils
-python3 permissions_checker.py --instructions
-```
-
 ### Check Database State
 ```bash
 # View current progress

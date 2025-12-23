@@ -102,19 +102,6 @@ CREATE TABLE IF NOT EXISTS deferred_features (
     priority INTEGER DEFAULT 5 -- 1=high, 5=low
 );
 
--- Enhancement tracking (replaces enhancement arrays in progress_tracker.json)
-CREATE TABLE IF NOT EXISTS enhancements (
-    id TEXT PRIMARY KEY,
-    feature_id TEXT,
-    description TEXT NOT NULL,
-    complexity TEXT NOT NULL, -- low, medium, high
-    tasks_added INTEGER DEFAULT 0,
-    milestone_target TEXT,
-    added_date DATE DEFAULT CURRENT_DATE,
-    status TEXT DEFAULT 'pending', -- pending, in_progress, completed
-    FOREIGN KEY (milestone_target) REFERENCES milestones(id)
-);
-
 -- PRD digest and original requirements (replaces prd_digest.json)
 CREATE TABLE IF NOT EXISTS prd_features (
     id TEXT PRIMARY KEY,
@@ -122,7 +109,6 @@ CREATE TABLE IF NOT EXISTS prd_features (
     original_text TEXT,
     prd_lines TEXT, -- JSON array of line references
     why_mvp TEXT,
-    is_enhancement BOOLEAN DEFAULT FALSE,
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -26,10 +26,10 @@ IRIS transforms ideas into working applications autonomously. Provide requiremen
 ## 🛠️ Manual Commands (for debugging/control)
 
 /iris:plan <PRD>           - Manual sprint planning
-/iris:execute [task-id]    - Manual task execution  
+/iris:execute [task-id]    - Manual task execution
 /iris:validate [milestone] - Manual milestone validation
-/iris:enhance [description] - Add features to existing plan
-/iris:security [scope]      - Essential security analysis
+/iris:document [flags]     - Generate/update documentation
+/iris:audit [scope]        - Essential security analysis
 
 ## ⚡ Quick Start - Autopilot Mode
 
@@ -43,7 +43,8 @@ IRIS transforms ideas into working applications autonomously. Provide requiremen
 1. Plan: /iris:plan "Your requirements"
 2. Execute: /iris:execute
 3. Validate: /iris:validate
-4. Security: /iris:security
+4. Document: /iris:document
+5. Audit: /iris:audit
 
 IRIS Autopilot uses adaptive complexity scaling, continuous execution, intelligent error recovery, and real-time documentation to deliver production-ready applications autonomously.
 

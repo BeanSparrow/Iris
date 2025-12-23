@@ -173,8 +173,8 @@ class DatabaseManager:
                 # Check if all required tables exist
                 required_tables = [
                     'project_metadata', 'milestones', 'tasks', 'task_dependencies',
-                    'technologies', 'technology_sources', 'guardrails', 
-                    'deferred_features', 'enhancements', 'prd_features',
+                    'technologies', 'technology_sources', 'guardrails',
+                    'deferred_features', 'prd_features',
                     'project_metrics', 'project_state', 'task_executions',
                     'milestone_validations'
                 ]
@@ -267,7 +267,7 @@ class DatabaseManager:
                 tables_to_export = [
                     'milestones', 'tasks', 'task_dependencies',
                     'technologies', 'guardrails', 'project_state',
-                    'enhancements', 'prd_features'
+                    'prd_features'
                 ]
                 
                 for table in tables_to_export:

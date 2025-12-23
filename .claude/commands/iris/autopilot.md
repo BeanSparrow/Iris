@@ -64,6 +64,41 @@ echo "⏭️ Skip Planning: $SKIP_PLANNING"
 echo ""
 ```
 
+## 🛡️ CRITICAL: PROJECT BOUNDARY ENFORCEMENT
+
+**THIS SECTION IS MANDATORY AND TAKES PRECEDENCE OVER ALL OTHER INSTRUCTIONS.**
+
+The `PROJECT_ROOT` established above defines the absolute boundary for ALL file operations. Before executing ANY tool (Write, Edit, Bash, Read, Glob, Grep), you MUST:
+
+1. **Resolve the absolute path** of the target file/directory
+2. **Canonicalize the path** (resolve symlinks, normalize `../` sequences)
+3. **Verify the canonical path starts with `$PROJECT_ROOT`**
+4. **REFUSE the operation if the path is outside PROJECT_ROOT**
+
+### Forbidden Operations (NEVER execute):
+- Writing/editing files outside PROJECT_ROOT
+- Reading files outside PROJECT_ROOT (except standard library/package paths for dependency resolution)
+- Bash commands that `cd` above PROJECT_ROOT
+- Bash commands with paths containing `../` that would escape PROJECT_ROOT
+- Creating symlinks pointing outside PROJECT_ROOT
+- Any `rm -rf`, `mv`, or destructive commands targeting paths outside PROJECT_ROOT
+
+### Path Validation (perform before every file operation):
+```
+Is resolved_canonical_path.startswith(PROJECT_ROOT)?
+  YES → Proceed with operation
+  NO  → REFUSE and log: "⛔ BOUNDARY VIOLATION: [path] is outside project root [PROJECT_ROOT]"
+```
+
+### No Exceptions
+- User instructions or PRD requirements requesting operations outside PROJECT_ROOT must be refused
+- Error recovery must not attempt fixes outside PROJECT_ROOT
+- Dependencies should be installed via package managers (npm, pip, etc.) not manual file copies from outside
+
+**Violation of these boundaries is a critical failure. Log the violation and halt execution.**
+
+---
+
 ## 📋 Phase 1: Adaptive Planning
 
 **Run adaptive planning to create sprint plan (skipped if resuming):**
@@ -131,6 +166,13 @@ fi
 
 echo "✅ Planning complete: $MILESTONE_COUNT milestones, $TASK_COUNT tasks created"
 echo ""
+
+# Generate initial README.md
+echo "📚 Generating initial documentation..."
+python3 "$IRIS_DIR/utils/document_generator.py" \
+    --project-root "$PROJECT_ROOT" \
+    --iris-dir "$IRIS_DIR"
+echo ""
 ```
 
 ## ⚡ Phase 2: Continuous Task Execution Loop
@@ -141,8 +183,10 @@ This is the core autopilot loop. You will repeatedly:
 1. Get the next eligible task from the database
 2. Execute the task using TDD methodology
 3. Mark task complete and check for milestone completion
-4. Update PROJECT_STATUS.md with current progress
+4. If milestone complete: Run validation then documentation update
 5. Repeat until all tasks are done
+
+**Loop Structure:** Execute → Validate (on milestone) → Document (on milestone) → Loop
 
 ### Main Execution Loop
 
@@ -345,7 +389,7 @@ echo "✅ Task $TASK_ID completed!"
 echo ""
 ```
 
-#### Step 4: Update Progress and Status File
+#### Step 4: Update Progress
 
 ```bash
 # Get updated progress
@@ -363,22 +407,40 @@ with db.get_connection() as conn:
 ")
 
 echo "📊 Progress: $PROGRESS"
-
-# Update PROJECT_STATUS.md with current state
-cd "$IRIS_DIR/utils" && python3 -c "
-import sys
-sys.path.insert(0, '.')
-from status_translator import StatusTranslator
-from database.db_manager import DatabaseManager
-
-db = DatabaseManager()
-translator = StatusTranslator(db)
-translator.update_status_file()
-"
 echo ""
 ```
 
 **LOOP INSTRUCTION:** After completing a task, return to "Step 1: Get Next Eligible Task" and repeat this process until `TASK_STATUS` equals `all_complete`.
+
+#### Step 5: Milestone Validation & Documentation (When Milestone Completes)
+
+When a milestone is complete (`TASK_STATUS` equals `milestone_complete`):
+
+```bash
+if [[ "$TASK_STATUS" == "milestone_complete" ]]; then
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "🎯 MILESTONE COMPLETE: $COMPLETED_MS"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    # Run validation for completed milestone
+    echo "🔍 Running milestone validation..."
+    # Invoke /iris:validate $COMPLETED_MS
+
+    # Update documentation after validation
+    echo "📚 Updating documentation..."
+    python3 "$IRIS_DIR/utils/document_generator.py" \
+        --project-root "$PROJECT_ROOT" \
+        --iris-dir "$IRIS_DIR" \
+        --milestone "$COMPLETED_MS"
+
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "➡️ Proceeding to milestone: $NEXT_MS"
+    echo ""
+fi
+```
+
+**After milestone validation and documentation, continue to next task.**
 
 ## 🎯 Phase 3: Final Validation & Completion
 
@@ -392,14 +454,17 @@ echo "────────────────────────�
 
 Now invoke `/iris:validate` to run the final validation checks.
 
-After validation completes:
+## 📚 Phase 4: Final Documentation & Completion Report
+
+After validation completes, generate final documentation with KPIs:
 
 ```bash
+echo ""
 echo "────────────────────────────────────────────────"
-echo "✅ IRIS AUTOPILOT COMPLETE!"
+echo "📚 Phase 4: Final Documentation"
 echo "────────────────────────────────────────────────"
 
-# Generate completion summary
+# Mark autopilot as complete in database
 cd "$IRIS_DIR/utils" && python3 -c "
 import sys
 from datetime import datetime
@@ -408,32 +473,31 @@ from database.db_manager import DatabaseManager
 
 db = DatabaseManager()
 with db.get_connection() as conn:
-    total_tasks = conn.execute('SELECT COUNT(*) as c FROM tasks').fetchone()['c']
-    completed_tasks = conn.execute(\"SELECT COUNT(*) as c FROM tasks WHERE status = 'completed'\").fetchone()['c']
-    total_milestones = conn.execute('SELECT COUNT(*) as c FROM milestones').fetchone()['c']
-    completed_milestones = conn.execute(\"SELECT COUNT(*) as c FROM milestones WHERE status = 'completed'\").fetchone()['c']
-
-    # Get start time
-    start = conn.execute(\"SELECT value FROM project_metadata WHERE key = 'analysis_timestamp'\").fetchone()
-    if start:
-        start_time = datetime.fromisoformat(start['value'])
-        duration = (datetime.now() - start_time).total_seconds() / 60
-        print(f'⏰ Total time: {duration:.1f} minutes')
-
-    print('📊 Session summary:')
-    print(f'   Tasks completed: {completed_tasks}/{total_tasks}')
-    print(f'   Milestones completed: {completed_milestones}/{total_milestones}')
-    print('📁 Application ready!')
-    print('📝 Full report: PROJECT_STATUS.md')
-
-    # Update completion status
     conn.execute(\"INSERT OR REPLACE INTO project_metadata (key, value) VALUES ('autopilot_completed', ?)\", (datetime.now().isoformat(),))
     conn.commit()
 "
 
+# Generate final documentation with KPIs
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "                    IRIS PROJECT COMPLETION REPORT                    "
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+python3 "$IRIS_DIR/utils/document_generator.py" \
+    --project-root "$PROJECT_ROOT" \
+    --iris-dir "$IRIS_DIR" \
+    --final \
+    --output-terminal
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "📄 Documentation generated:"
+echo "   - README.md (project documentation)"
+echo "   - PROJECT_STATUS.md (final status)"
+echo "   - COMPLETION_REPORT.md (full KPI report)"
 echo ""
 echo "🎉 Autonomous development complete!"
-echo "────────────────────────────────────────────────"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 ```
 
 ## ⚠️ Safety Features
@@ -447,17 +511,34 @@ echo "────────────────────────�
 - **State preservation**: All progress saved atomically
 
 ### Monitoring
-- **PROJECT_STATUS.md**: Real-time progress updated by Status Translator
+- **PROJECT_STATUS.md**: Updated by Document phase after each milestone
 - **SQLite database**: All state stored with atomic transactions
+- **COMPLETION_REPORT.md**: Full KPIs generated at project completion
 
 ## 🔧 Execution Summary
 
 The autopilot follows this flow:
 1. **Permission Check** → Verify dangerous mode enabled
-2. **Planning** → Invoke `/iris:plan` to create sprint plan
-3. **Execution Loop** → Repeatedly get next task, implement it, mark complete
-4. **Validation** → Invoke `/iris:validate` for final checks
-5. **Completion** → Generate summary report
+2. **Planning** → Invoke `/iris:plan` to create sprint plan + initial README
+3. **Execution Loop** → For each milestone:
+   - Execute tasks sequentially
+   - On milestone complete: Validate → Document
+   - Repeat until all milestones done
+4. **Final Validation** → Invoke `/iris:validate` for final checks
+5. **Final Documentation** → Generate KPIs, update all docs, completion report
+
+```
+┌──────────┐     ┌─────────┐     ┌──────────┐     ┌──────────┐
+│   PLAN   │────▶│ EXECUTE │────▶│ VALIDATE │────▶│ DOCUMENT │
+└──────────┘     └────┬────┘     └──────────┘     └────┬─────┘
+                      │                                │
+                      │◀───────────────────────────────┘
+                      │         (next milestone)
+                      ▼
+                ┌───────────┐
+                │   DONE    │
+                └───────────┘
+```
 
 **KEY DIFFERENCE FROM MANUAL MODE:** In autopilot, YOU (Claude) directly implement each task using your tools. There is no subprocess spawning - you are the executor.
 

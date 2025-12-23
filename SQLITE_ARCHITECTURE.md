@@ -135,21 +135,6 @@ CREATE TABLE deferred_features (
 );
 ```
 
-#### **enhancements**
-```sql
-CREATE TABLE enhancements (
-    id TEXT PRIMARY KEY,
-    feature_id TEXT,
-    description TEXT NOT NULL,
-    complexity TEXT NOT NULL, -- low, medium, high
-    tasks_added INTEGER DEFAULT 0,
-    milestone_target TEXT,
-    added_date DATE DEFAULT CURRENT_DATE,
-    status TEXT DEFAULT 'pending', -- pending, in_progress, completed
-    FOREIGN KEY (milestone_target) REFERENCES milestones(id)
-);
-```
-
 #### **prd_features**
 ```sql
 CREATE TABLE prd_features (
@@ -242,41 +227,14 @@ class DatabaseManager:
     def validate_schema(self) -> bool
 ```
 
-### **Status Translator** (`status_translator.py`)
-Converts database state to human-readable documentation:
-- **Real-time queries** for current project status
-- **Progress calculations** with milestone completion percentages
-- **Markdown generation** for PROJECT_STATUS.md
-- **Error state detection** and reporting
-
-```python
-class StatusTranslator:
-    def generate_status_markdown(self) -> str
-    def get_milestone_progress(self) -> Dict[str, Any]
-    def get_task_summary(self) -> Dict[str, Any]
-    def get_project_health(self) -> Dict[str, Any]
-```
-
 ### **SQLite-based CLI Tools**
 Enhanced versions of original CLI utilities:
 
-#### **executor_cli_sqlite.py**
+#### **executor_cli.py**
 - **Atomic task updates** with transaction safety
 - **Dependency validation** via database queries
 - **Progress tracking** with real-time calculations
 - **Error recovery** with automatic rollback
-
-#### **enhance_cli_sqlite.py**
-- **Feature analysis** with database integration
-- **Smart placement** using milestone capacity queries
-- **Impact assessment** via database statistics
-- **Atomic enhancement** application with rollback
-
-#### **continuous_executor_sqlite.py**
-- **Database-driven execution** loop
-- **Real-time status updates** with Status Translator
-- **Error recovery** using database state
-- **Progress persistence** across interruptions
 
 ## 🔄 Transaction Patterns
 
@@ -316,34 +274,6 @@ def complete_task(task_id: str) -> Dict[str, Any]:
     return results[0] if success else {"error": "Transaction failed"}
 ```
 
-### Enhancement Application
-```python
-def apply_enhancement(analysis: FeatureAnalysis) -> Dict[str, Any]:
-    backup_path = db.backup_database()
-    
-    def enhancement_operation(conn):
-        # Create tasks
-        for task in enhancement_tasks:
-            conn.execute("INSERT INTO tasks (...) VALUES (...)", task_data)
-        
-        # Update dependencies
-        for dep in task_dependencies:
-            conn.execute("INSERT INTO task_dependencies (...) VALUES (...)", dep_data)
-        
-        # Record enhancement
-        conn.execute("INSERT INTO enhancements (...) VALUES (...)", enhancement_data)
-        
-        return {"tasks_added": len(enhancement_tasks)}
-    
-    success, results = db.execute_transaction([enhancement_operation])
-    
-    if not success:
-        db.restore_from_backup(backup_path)
-        return {"error": "Enhancement failed, database restored"}
-    
-    return results[0]
-```
-
 ## 💾 Backup System
 
 ### Automatic Backup Strategy
@@ -355,10 +285,10 @@ def apply_enhancement(analysis: FeatureAnalysis) -> Dict[str, Any]:
 ### Backup File Naming
 ```
 .tasks/backups/
-├── 20241125_120000_pre_enhancement.db    # Before enhancement
+├── 20241125_120000_pre_operation.db      # Before major operation
 ├── 20241125_120500_milestone_M1.db       # Milestone completion
 ├── 20241125_121000_periodic.db           # Periodic backup
-└── 20241125_121500_error_recovery.db     # Before error recovery
+└── 20241125_121500_pre_recovery.db       # Before error recovery
 ```
 
 ### Cleanup Policy
@@ -397,7 +327,7 @@ All public interfaces remain identical:
 # Same command interfaces
 /iris:plan "Build an API"
 /iris:execute T-API-001
-/iris:enhance "Add authentication"
+/iris:validate M1
 
 # Same output format
 ✅ Task T-API-001 completed
@@ -410,7 +340,6 @@ All public interfaces remain identical:
 ### Foreign Key Constraints
 - **Tasks → Milestones**: Ensures tasks belong to valid milestones
 - **Dependencies → Tasks**: Ensures dependency references are valid
-- **Enhancements → Milestones**: Ensures enhancements target valid milestones
 
 ### Validation Triggers
 ```sql
@@ -437,7 +366,6 @@ END;
 ### Consistency Checks
 - **Milestone status**: Must match task completion status
 - **Task ordering**: Must be sequential within milestones
-- **Enhancement tracking**: Must reference valid milestones
 - **Dependency validity**: No dangling or circular references
 
 ## 🚀 Future Extensions

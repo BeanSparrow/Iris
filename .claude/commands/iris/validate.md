@@ -528,8 +528,8 @@ else:
     print('❌ Failed to update database')
 "
 
-# Trigger Status Translator update
-python3 "$IRIS_DIR/utils/status_translator.py"
+# Note: PROJECT_STATUS.md is updated by /iris:document phase after validation
+# This consolidates all documentation updates in one place
 
 echo "✅ Milestone $MILESTONE_ID validation complete"
 

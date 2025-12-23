@@ -67,7 +67,7 @@ cp -r /path/to/iris ~/.claude/commands/
 | `/iris:plan <PRD>` | Generate sprint plan (used internally by autopilot) |
 | `/iris:execute [task-id]` | Execute tasks (used internally by autopilot) |
 | `/iris:validate [milestone]` | Validate milestone (used internally by autopilot) |
-| `/iris:enhance <feature>` | Add feature to existing plan |
+| `/iris:document [flags]` | Generate/update documentation (README, status, completion report) |
 | `/iris:audit [scope]` | Security analysis |
 | `/iris:help` | Display help information |
 
@@ -81,15 +81,33 @@ Iris is designed for autonomous operation. Provide your requirements and let it 
 
 This requires the permissions flag. See [Permission Setup](#permission-setup).
 
+### Development Loop
+
+Autopilot executes a 4-phase loop for each milestone:
+
+```
+Plan → Execute → Validate → Document
+         ↑________________________↓
+              (per milestone)
+```
+
+1. **Plan** - Analyze PRD, create milestones and tasks
+2. **Execute** - Implement tasks with TDD methodology
+3. **Validate** - Verify milestone completion, run tests
+4. **Document** - Update README.md, PROJECT_STATUS.md
+
+On final completion, Iris generates a `COMPLETION_REPORT.md` with KPIs (total time, tasks completed, validation rate, errors recovered).
+
 ### Debugging Mode
 
-The individual commands (`/iris:plan`, `/iris:execute`, `/iris:validate`) can be run separately for debugging or step-by-step control. Set `IRIS_MANUAL_MODE=true` to enable blocking on errors:
+The individual commands (`/iris:plan`, `/iris:execute`, `/iris:validate`, `/iris:document`) can be run separately for debugging or step-by-step control. Set `IRIS_MANUAL_MODE=true` to enable blocking on errors:
 
 ```bash
 export IRIS_MANUAL_MODE=true
 /iris:plan "Build a REST API for task management"
 /iris:execute
 /iris:validate
+/iris:document
 ```
 
 ## Permission Setup
@@ -133,7 +151,9 @@ your-project/
 │   ├── iris_project.db      # SQLite database (all project state)
 │   ├── backups/             # Automatic database backups
 │   └── autopilot.log        # Execution logs
+├── README.md                # Auto-generated project documentation
 ├── PROJECT_STATUS.md        # Human-readable progress summary
+├── COMPLETION_REPORT.md     # Final KPIs (generated on completion)
 └── [your application files]
 ```
 
@@ -148,7 +168,6 @@ The SQLite database contains these tables:
 - `project_metadata` - Configuration and analysis results
 - `project_state` - Current execution state
 - `deferred_features` - Features postponed for future work
-- `enhancements` - Feature additions after initial planning
 
 ## Interruption & Resume
 
@@ -186,7 +205,7 @@ For larger projects, consider:
 ├── plan.md                   # Sprint planning
 ├── execute.md                # Task execution
 ├── validate.md               # Milestone validation
-├── enhance.md                # Feature enhancement
+├── document.md               # Documentation generation
 ├── audit.md                  # Security analysis
 ├── help.md                   # Help documentation
 └── utils/
@@ -198,8 +217,7 @@ For larger projects, consider:
     ├── iris_adaptive.py      # Complexity analysis
     ├── executor_cli.py       # Task management CLI
     ├── autonomous_validator.py # Validation system
-    ├── permissions_checker.py  # Permission warnings display
-    ├── status_translator.py    # Progress reporting
+    ├── document_generator.py   # README, status, and completion reports
     └── [other utilities]
 ```
 

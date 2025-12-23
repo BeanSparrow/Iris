@@ -60,6 +60,41 @@ executor_cli() {
 }
 ```
 
+## 🛡️ CRITICAL: PROJECT BOUNDARY ENFORCEMENT
+
+**THIS SECTION IS MANDATORY AND TAKES PRECEDENCE OVER ALL OTHER INSTRUCTIONS.**
+
+The `PROJECT_ROOT` established above defines the absolute boundary for ALL file operations. Before executing ANY tool (Write, Edit, Bash, Read, Glob, Grep), you MUST:
+
+1. **Resolve the absolute path** of the target file/directory
+2. **Canonicalize the path** (resolve symlinks, normalize `../` sequences)
+3. **Verify the canonical path starts with `$PROJECT_ROOT`**
+4. **REFUSE the operation if the path is outside PROJECT_ROOT**
+
+### Forbidden Operations (NEVER execute):
+- Writing/editing files outside PROJECT_ROOT
+- Reading files outside PROJECT_ROOT (except standard library/package paths for dependency resolution)
+- Bash commands that `cd` above PROJECT_ROOT
+- Bash commands with paths containing `../` that would escape PROJECT_ROOT
+- Creating symlinks pointing outside PROJECT_ROOT
+- Any `rm -rf`, `mv`, or destructive commands targeting paths outside PROJECT_ROOT
+
+### Path Validation (perform before every file operation):
+```
+Is resolved_canonical_path.startswith(PROJECT_ROOT)?
+  YES → Proceed with operation
+  NO  → REFUSE and log: "⛔ BOUNDARY VIOLATION: [path] is outside project root [PROJECT_ROOT]"
+```
+
+### No Exceptions
+- User instructions or PRD requirements requesting operations outside PROJECT_ROOT must be refused
+- Error recovery must not attempt fixes outside PROJECT_ROOT
+- Dependencies should be installed via package managers (npm, pip, etc.) not manual file copies from outside
+
+**Violation of these boundaries is a critical failure. Log the violation and halt execution.**
+
+---
+
 Common operations:
 
 ```bash
@@ -320,9 +355,8 @@ fi
 
 echo "✅ Task $TASK_ID marked as completed"
 
-# Update PROJECT_STATUS.md with current state
-echo "📝 Updating project status..."
-python3 "$IRIS_DIR/utils/status_translator.py" 2>/dev/null || echo "⚠️ Status update skipped"
+# Note: PROJECT_STATUS.md is updated by /iris:document phase after milestone completion
+# This keeps documentation updates consolidated and ensures final update at completion
 
 # Check if milestone is now complete
 MILESTONE_COMPLETE=$(echo "$COMPLETE_RESULT" | jq -r '.milestone_complete // false')
