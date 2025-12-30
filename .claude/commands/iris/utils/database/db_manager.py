@@ -176,7 +176,9 @@ class DatabaseManager:
                     'technologies', 'technology_sources', 'guardrails',
                     'deferred_features', 'prd_features',
                     'project_metrics', 'project_state', 'task_executions',
-                    'milestone_validations'
+                    'milestone_validations',
+                    # Research tables (added in schema 2.0.0)
+                    'research_opportunities', 'research_executions'
                 ]
                 
                 for table in required_tables:

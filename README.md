@@ -8,7 +8,7 @@ Iris is an experimental framework that attempts to transform a Product Requireme
 
 The name comes from the iris of a camera—the aperture that adapts to different lighting conditions. Similarly, this framework adapts its approach based on project complexity, scaling from simple scripts to full applications.
 
-**Important:** This is a prototype-focused tool designed for rapid feasibility testing and proof-of-concept development. It is not intended for production application development.
+**Important:** This is a prototype-focused tool designed for rapid feasibility testing and proof-of-concept development. It is not intended for production application development. (Yet)
 
 ## Origin & Attribution
 
@@ -24,6 +24,15 @@ Iris extends Gustav with autonomous execution capabilities and replaces the JSON
 
 ## Key Changes from Gustav
 
+### Prose-Orchestration Architecture
+Iris uses a "prose-orchestration" approach where workflow coordination is embedded in natural language instructions within markdown files, rather than programmatic hooks or scripts. Each `.md` command file contains instructions that Claude reads and follows directly.
+
+This approach:
+- Leverages LLM comprehension for dynamic decision-making
+- Avoids brittle hardcoded logic that can't adapt to context
+- Makes the framework readable and auditable by humans
+- Allows modules to invoke each other inline (e.g., plan.md reads and executes research.md)
+
 ### Autonomous Execution
 Gustav requires human validation at each milestone. Iris introduces an autopilot mode that runs continuously from PRD to completion, with configurable validation frequency based on project complexity.
 
@@ -33,18 +42,26 @@ Gustav tracks project state across multiple JSON files (`task_graph.json`, `prog
 - Atomic transactions for data integrity
 - Relational structure for task dependencies
 - Automatic backup and restore capabilities
-- Schema versioning for future migrations
+- Schema versioning (currently v2.0.0)
+
+### Dynamic Technology Research
+Gustav uses a fixed cache of "common decisions" with predetermined research agent counts. Iris introduces a dynamic research system:
+
+- **Opportunity Catalog**: 35+ research opportunities across 5 categories (stack, version, architecture, ops, custom)
+- **PRD-Driven Selection**: Research opportunities are selected based on what the PRD doesn't specify
+- **Parallel Subagents**: Research is executed by parallel `general-purpose` subagents with web access
+- **Coherence Verification**: A reconciliation phase ensures all technology choices work together
 
 ### Adaptive Complexity Scaling
 Gustav applies the same enterprise-grade process to all projects. Iris analyzes the PRD and scales its approach accordingly:
 
-| Complexity | Features | Research Agents | Tasks/Milestone | Validation |
-|------------|----------|-----------------|-----------------|------------|
-| MICRO | 1-2 | 0 | 1-3 | Minimal |
-| SMALL | 1-3 | 2 | 2-5 | Major milestones |
-| MEDIUM | 3-7 | 4 | 3-7 | Each milestone |
-| LARGE | 5-10 | 8 | 5-10 | Comprehensive |
-| ENTERPRISE | 7-15 | 12 | 8-15 | Full suite |
+| Complexity | Features | Research | Tasks/Milestone | Validation |
+|------------|----------|----------|-----------------|------------|
+| MICRO | 1-2 | Minimal | 1-3 | Minimal |
+| SMALL | 1-3 | Basic | 2-5 | Major milestones |
+| MEDIUM | 3-7 | Full | 3-7 | Each milestone |
+| LARGE | 5-10 | Comprehensive | 5-10 | Comprehensive |
+| ENTERPRISE | 7-15 | Exhaustive | 8-15 | Full suite |
 
 ## Installation
 
@@ -157,17 +174,23 @@ your-project/
 └── [your application files]
 ```
 
-### Database Schema
+### Database Schema (v2.0.0)
 
 The SQLite database contains these tables:
 
+**Core Tables:**
 - `milestones` - Project phases with status tracking
 - `tasks` - Individual work items with dependencies
 - `task_dependencies` - Relationships between tasks
-- `technologies` - Technology stack decisions
 - `project_metadata` - Configuration and analysis results
 - `project_state` - Current execution state
 - `deferred_features` - Features postponed for future work
+
+**Research Tables:**
+- `research_opportunities` - Catalog of research topics selected for this project
+- `research_executions` - Subagent execution history for debugging
+- `technologies` - Approved technology stack with confidence levels
+- `technology_sources` - Verification URLs for technology decisions
 
 ## Interruption & Resume
 
@@ -199,26 +222,55 @@ For larger projects, consider:
 
 ## Architecture
 
+Iris uses prose-orchestration: each `.md` file contains natural language instructions that Claude executes directly. Files can invoke each other inline (plan.md reads and follows research.md).
+
 ```
 .claude/commands/iris/
-├── autopilot.md              # Autonomous orchestrator
-├── plan.md                   # Sprint planning
-├── execute.md                # Task execution
+├── autopilot.md              # Autonomous orchestrator (invokes plan → execute → validate → document)
+├── plan.md                   # Sprint planning (invokes research.md inline)
+├── research.md               # Technology research (3-phase: foundation → parallel → reconciliation)
+├── execute.md                # Task execution with TDD
 ├── validate.md               # Milestone validation
 ├── document.md               # Documentation generation
 ├── audit.md                  # Security analysis
 ├── help.md                   # Help documentation
 └── utils/
     ├── database/
-    │   ├── db_manager.py     # Database operations
-    │   ├── schema.sql        # Table definitions
+    │   ├── db_manager.py     # Database operations (shared by all modules)
+    │   ├── schema.sql        # Table definitions (v2.0.0)
     │   └── backup_manager.py # Backup/restore
-    ├── autopilot_init.py     # Autopilot initialization (project detection, permissions, resume)
+    ├── autopilot_init.py     # Autopilot initialization
     ├── iris_adaptive.py      # Complexity analysis
     ├── executor_cli.py       # Task management CLI
     ├── autonomous_validator.py # Validation system
     ├── document_generator.py   # README, status, and completion reports
     └── [other utilities]
+```
+
+### Prose-Orchestration Flow
+
+```
+autopilot.md
+    │
+    ▼
+plan.md ──────────────────┐
+    │                     │
+    ▼                     ▼
+[complexity analysis]   research.md (inline)
+    │                     │
+    │◄────────────────────┘
+    ▼
+[milestone/task creation]
+    │
+    ▼
+execute.md ◄──────────────┐
+    │                     │
+    ▼                     │
+validate.md               │
+    │                     │
+    ▼                     │
+document.md ──────────────┘
+                    (loop per milestone)
 ```
 
 ## Status
@@ -246,6 +298,12 @@ This project builds upon the Gustav Framework. Please respect the original licen
 
 - [Dimitri Tholen](https://github.com/dimitritholen) for creating the Gustav Framework
 - The Claude Code team at Anthropic
+
+## Contributors
+
+| Contributor | Contribution |
+|-------------|--------------|
+| [@dhunt84971](https://github.com/dhunt84971) | Testing and Design Review |
 
 ---
 

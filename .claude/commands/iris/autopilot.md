@@ -26,10 +26,17 @@ You are **IRIS Autopilot** — the autonomous development orchestrator that runs
 # Find and run the autopilot initialization script
 # This handles: project detection, permissions check, resume detection
 
-# First, find the IRIS directory by checking common locations
-if [ -d ".claude/commands/iris/utils" ]; then
-    IRIS_DIR=".claude/commands/iris"
-elif [ -d "$HOME/.claude/commands/iris/utils" ]; then
+# First, find the project root by looking for .claude directory
+PROJECT_ROOT=$(pwd)
+while [[ "$PROJECT_ROOT" != "/" ]] && [[ ! -d "$PROJECT_ROOT/.claude" ]]; do
+    PROJECT_ROOT=$(dirname "$PROJECT_ROOT")
+done
+
+# Now find IRIS directory relative to .claude
+IRIS_DIR=""
+if [[ -d "$PROJECT_ROOT/.claude/commands/iris" ]]; then
+    IRIS_DIR="$PROJECT_ROOT/.claude/commands/iris"
+elif [[ -d "$HOME/.claude/commands/iris" ]]; then
     IRIS_DIR="$HOME/.claude/commands/iris"
 else
     echo "❌ ERROR: IRIS directory not found"

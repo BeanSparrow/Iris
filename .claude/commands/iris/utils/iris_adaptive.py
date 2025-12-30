@@ -2,6 +2,12 @@
 """
 Iris Adaptive Framework - Dynamic complexity-based adjustments
 Analyzes project requirements and scales framework complexity accordingly
+
+Version: 2.0.0
+Changes in 2.0.0:
+  - Removed ResearchOrchestrator class (research now handled by research.md)
+  - Removed research_agents_count, skip_common_research from AdaptiveConfig
+  - Research opportunities are now dynamically selected based on PRD analysis
 """
 
 import json
@@ -34,26 +40,24 @@ class AdaptiveConfig:
     """Configuration that adapts based on project complexity"""
     complexity: ProjectComplexity
     project_type: ProjectType
-    
+
     # Feature limits
     max_mvp_features: int = field(init=False)
     min_mvp_features: int = field(init=False)
-    
-    # Research configuration  
-    research_agents_count: int = field(init=False)
-    skip_common_research: bool = field(init=False)
-    research_depth: str = field(init=False)  # "shallow", "standard", "deep"
-    
+
     # Milestone configuration
     tasks_per_milestone: Tuple[int, int] = field(init=False)  # (min, max)
     validation_frequency: str = field(init=False)  # "every", "major", "final"
     allow_parallel_milestones: bool = field(init=False)
-    
+
     # Process configuration
     enforce_tdd: bool = field(init=False)
     require_validation_pause: bool = field(init=False)
     documentation_level: str = field(init=False)  # "minimal", "standard", "comprehensive"
-    
+
+    # Note: Research configuration is now handled dynamically by research.md
+    # based on PRD analysis, not fixed counts per complexity level
+
     def __post_init__(self):
         """Set configuration based on complexity and type"""
         self._configure_by_complexity()
@@ -61,13 +65,11 @@ class AdaptiveConfig:
     
     def _configure_by_complexity(self):
         """Base configuration by complexity level"""
+        # Note: Research configuration removed - now handled dynamically by research.md
         configs = {
             ProjectComplexity.MICRO: {
                 "max_mvp_features": 2,
                 "min_mvp_features": 1,
-                "research_agents_count": 0,  # No research needed
-                "skip_common_research": True,
-                "research_depth": "shallow",
                 "tasks_per_milestone": (1, 3),
                 "validation_frequency": "final",
                 "allow_parallel_milestones": False,
@@ -78,9 +80,6 @@ class AdaptiveConfig:
             ProjectComplexity.SMALL: {
                 "max_mvp_features": 3,
                 "min_mvp_features": 1,
-                "research_agents_count": 2,  # Only essential agents
-                "skip_common_research": True,
-                "research_depth": "shallow",
                 "tasks_per_milestone": (2, 5),
                 "validation_frequency": "major",
                 "allow_parallel_milestones": False,
@@ -91,9 +90,6 @@ class AdaptiveConfig:
             ProjectComplexity.MEDIUM: {
                 "max_mvp_features": 7,
                 "min_mvp_features": 3,
-                "research_agents_count": 4,  # Core agents
-                "skip_common_research": False,
-                "research_depth": "standard",
                 "tasks_per_milestone": (3, 5),
                 "validation_frequency": "every",
                 "allow_parallel_milestones": True,
@@ -104,9 +100,6 @@ class AdaptiveConfig:
             ProjectComplexity.LARGE: {
                 "max_mvp_features": 10,
                 "min_mvp_features": 5,
-                "research_agents_count": 6,  # Most agents
-                "skip_common_research": False,
-                "research_depth": "deep",
                 "tasks_per_milestone": (4, 7),
                 "validation_frequency": "every",
                 "allow_parallel_milestones": True,
@@ -117,9 +110,6 @@ class AdaptiveConfig:
             ProjectComplexity.ENTERPRISE: {
                 "max_mvp_features": 15,
                 "min_mvp_features": 7,
-                "research_agents_count": 8,  # All agents
-                "skip_common_research": False,
-                "research_depth": "deep",
                 "tasks_per_milestone": (3, 5),  # Keep manageable
                 "validation_frequency": "every",
                 "allow_parallel_milestones": True,
@@ -128,40 +118,36 @@ class AdaptiveConfig:
                 "documentation_level": "comprehensive"
             }
         }
-        
+
         config = configs[self.complexity]
         for key, value in config.items():
             setattr(self, key, value)
     
     def _adjust_for_project_type(self):
         """Fine-tune configuration based on project type"""
+        # Note: Research adjustments removed - now handled dynamically by research.md
         adjustments = {
             ProjectType.SCRIPT: {
-                "research_agents_count": 0,
                 "enforce_tdd": False,
                 "tasks_per_milestone": (1, 2)
             },
             ProjectType.BUG_FIX: {
-                "research_agents_count": 0,
                 "validation_frequency": "final",
                 "enforce_tdd": True
             },
             ProjectType.REFACTOR: {
-                "research_agents_count": 1,
                 "enforce_tdd": True,
                 "documentation_level": "comprehensive"
             },
             ProjectType.API_ENDPOINT: {
-                "research_agents_count": min(2, self.research_agents_count),
                 "enforce_tdd": True
             },
             ProjectType.MICROSERVICE: {
-                "research_agents_count": max(4, self.research_agents_count),
                 "enforce_tdd": True,
                 "documentation_level": "comprehensive"
             }
         }
-        
+
         if self.project_type in adjustments:
             for key, value in adjustments[self.project_type].items():
                 setattr(self, key, value)
@@ -339,107 +325,13 @@ class ProjectAnalyzer:
         
         return complexity
 
-class ResearchOrchestrator:
-    """Orchestrates research agents based on project needs"""
-    
-    # Common technology decisions that can be cached
-    COMMON_DECISIONS = {
-        "web_frontend_2024": {
-            "React": {"version": "18.2.0", "source": "https://react.dev"},
-            "Vue": {"version": "3.4.0", "source": "https://vuejs.org"},
-            "Next.js": {"version": "14.1.0", "source": "https://nextjs.org"}
-        },
-        "python_web_2024": {
-            "Django": {"version": "5.0", "source": "https://djangoproject.com"},
-            "FastAPI": {"version": "0.109.0", "source": "https://fastapi.tiangolo.com"},
-            "Flask": {"version": "3.0.0", "source": "https://flask.palletsprojects.com"}
-        },
-        "testing_javascript_2024": {
-            "Jest": {"version": "29.7.0", "source": "https://jestjs.io"},
-            "Vitest": {"version": "1.2.0", "source": "https://vitest.dev"},
-            "Cypress": {"version": "13.6.0", "source": "https://cypress.io"}
-        }
-    }
-    
-    @classmethod
-    def get_research_agents(cls, config: AdaptiveConfig, 
-                           project_keywords: List[str]) -> Dict[str, Dict]:
-        """
-        Get research agent configuration based on project needs
-        
-        Returns:
-            Dictionary of agent configurations to launch
-        """
-        agents = {}
-        
-        # No research for micro projects
-        if config.research_agents_count == 0:
-            return agents
-        
-        # Check cache for common decisions
-        cached_tech = cls._check_cache(project_keywords) if config.skip_common_research else {}
-        
-        # Base agents (always included if research needed)
-        if config.research_agents_count >= 2:
-            if "language" not in cached_tech:
-                agents["SA-1-LANG"] = {
-                    "query": f"best programming language {project_keywords[0]} 2024",
-                    "depth": config.research_depth
-                }
-            
-            if "testing" not in cached_tech:
-                agents["SA-2-TEST"] = {
-                    "query": f"testing best practices {project_keywords[0]} 2024",
-                    "depth": "shallow"  # Testing usually doesn't need deep research
-                }
-        
-        # Additional agents based on count and type
-        if config.research_agents_count >= 4:
-            agents["SA-3-ARCH"] = {
-                "query": f"architecture patterns {config.project_type.value} 2024",
-                "depth": config.research_depth
-            }
-            
-            agents["SA-4-DEPLOY"] = {
-                "query": f"deployment options {config.project_type.value} 2024",
-                "depth": "shallow"
-            }
-        
-        # Specialized agents for larger projects
-        if config.research_agents_count >= 6:
-            if config.project_type in [ProjectType.FULL_STACK, ProjectType.CRUD_APP]:
-                agents["SA-5-DATABASE"] = {
-                    "query": "database choices 2024 SQL NoSQL comparison",
-                    "depth": config.research_depth
-                }
-                agents["SA-6-FRONTEND"] = {
-                    "query": "frontend frameworks 2024 comparison",
-                    "depth": config.research_depth
-                }
-        
-        return agents
-    
-    @classmethod
-    def _check_cache(cls, keywords: List[str]) -> Dict[str, Dict]:
-        """Check if we have cached decisions for common technology choices"""
-        cached = {}
-        
-        for keyword in keywords:
-            keyword_lower = keyword.lower()
-            
-            # Check for web frontend
-            if any(term in keyword_lower for term in ["react", "vue", "frontend", "ui"]):
-                cached["frontend"] = cls.COMMON_DECISIONS.get("web_frontend_2024", {})
-            
-            # Check for Python web
-            if any(term in keyword_lower for term in ["python", "django", "flask", "fastapi"]):
-                cached["backend"] = cls.COMMON_DECISIONS.get("python_web_2024", {})
-            
-            # Check for JavaScript testing
-            if any(term in keyword_lower for term in ["test", "jest", "cypress"]):
-                cached["testing"] = cls.COMMON_DECISIONS.get("testing_javascript_2024", {})
-        
-        return cached
+# Note: ResearchOrchestrator class has been removed in v2.0.0
+# Research is now handled dynamically by research.md which:
+# - Analyzes PRD to select research opportunities from a catalog
+# - Launches parallel general-purpose subagents for web research
+# - Verifies technology choices from official sources
+# - Stores results with confidence levels in the database
+# See: .claude/commands/iris/research.md
 
 class MilestoneGenerator:
     """Generates milestone structure based on project complexity"""
@@ -550,22 +442,22 @@ class MilestoneGenerator:
 
 def main():
     """Example usage and testing"""
-    
+
     # Example PRD for testing
     example_prd_micro = """
     Create a simple Python script to convert CSV files to JSON format.
     It should handle basic error cases and support command line arguments.
     """
-    
+
     example_prd_large = """
     Build a comprehensive e-commerce platform with microservices architecture.
-    Features include user authentication, product catalog, shopping cart, 
+    Features include user authentication, product catalog, shopping cart,
     payment processing, order management, inventory tracking, reporting dashboard,
-    email notifications, and admin panel. Must be scalable and enterprise-ready 
-    with multiple services handling authentication, payment, notification and 
+    email notifications, and admin panel. Must be scalable and enterprise-ready
+    with multiple services handling authentication, payment, notification and
     reporting capabilities.
     """
-    
+
     # Analyze micro project
     print("=" * 60)
     print("MICRO PROJECT ANALYSIS")
@@ -574,10 +466,10 @@ def main():
     print(f"Complexity: {config_micro.complexity.value}")
     print(f"Type: {config_micro.project_type.value}")
     print(f"Max Features: {config_micro.max_mvp_features}")
-    print(f"Research Agents: {config_micro.research_agents_count}")
     print(f"Tasks per Milestone: {config_micro.tasks_per_milestone}")
     print(f"TDD Required: {config_micro.enforce_tdd}")
-    
+    print(f"Research: Dynamic (handled by research.md)")
+
     # Analyze large project
     print("\n" + "=" * 60)
     print("LARGE PROJECT ANALYSIS")
@@ -586,28 +478,18 @@ def main():
     print(f"Complexity: {config_large.complexity.value}")
     print(f"Type: {config_large.project_type.value}")
     print(f"Max Features: {config_large.max_mvp_features}")
-    print(f"Research Agents: {config_large.research_agents_count}")
     print(f"Tasks per Milestone: {config_large.tasks_per_milestone}")
     print(f"TDD Required: {config_large.enforce_tdd}")
-    
-    # Show research agents for each
+    print(f"Research: Dynamic (handled by research.md)")
+
     print("\n" + "=" * 60)
-    print("RESEARCH ORCHESTRATION")
+    print("RESEARCH NOTE")
     print("=" * 60)
-    
-    agents_micro = ResearchOrchestrator.get_research_agents(
-        config_micro, ["csv", "json", "converter"]
-    )
-    print(f"\nMicro project agents: {len(agents_micro)}")
-    for agent_id, agent_config in agents_micro.items():
-        print(f"  {agent_id}: {agent_config['query'][:50]}...")
-    
-    agents_large = ResearchOrchestrator.get_research_agents(
-        config_large, ["ecommerce", "microservices", "platform"]  
-    )
-    print(f"\nLarge project agents: {len(agents_large)}")
-    for agent_id, agent_config in agents_large.items():
-        print(f"  {agent_id}: {agent_config['query'][:50]}...")
+    print("Research is now handled dynamically by research.md")
+    print("- Research opportunities selected based on PRD gaps")
+    print("- Parallel subagents perform actual web research")
+    print("- Results stored with confidence levels")
+    print("See: .claude/commands/iris/research.md")
 
 if __name__ == "__main__":
     main()

@@ -40,17 +40,18 @@ You are MVP Sprint Architect — a research‑driven, YAGNI‑focused planner th
 Before beginning traditional Iris planning, analyze project complexity using the adaptive framework:
 
 ```bash
-# Find Iris utilities
+# Find project root by looking for .claude directory
 PROJECT_ROOT=$(pwd)
-while [[ "$PROJECT_ROOT" != "/" ]] && [[ ! -d "$PROJECT_ROOT/.tasks" ]] && [[ ! -d "$PROJECT_ROOT/.git" ]]; do
+while [[ "$PROJECT_ROOT" != "/" ]] && [[ ! -d "$PROJECT_ROOT/.claude" ]]; do
     PROJECT_ROOT=$(dirname "$PROJECT_ROOT")
 done
 
+# Find IRIS directory relative to .claude
 IRIS_DIR=""
 if [[ -d "$PROJECT_ROOT/.claude/commands/iris" ]]; then
     IRIS_DIR="$PROJECT_ROOT/.claude/commands/iris"
-elif [[ -d ~/.claude/commands/iris ]]; then
-    IRIS_DIR=~/.claude/commands/iris
+elif [[ -d "$HOME/.claude/commands/iris" ]]; then
+    IRIS_DIR="$HOME/.claude/commands/iris"
 fi
 
 # Run adaptive analysis
@@ -76,12 +77,10 @@ config = ga.ProjectAnalyzer.analyze(prd_content)
 print(f'COMPLEXITY={config.complexity.value}')
 print(f'PROJECT_TYPE={config.project_type.value}')
 print(f'MAX_FEATURES={config.max_mvp_features}')
-print(f'RESEARCH_AGENTS={config.research_agents_count}')
 print(f'MILESTONE_MIN={config.tasks_per_milestone[0]}')
 print(f'MILESTONE_MAX={config.tasks_per_milestone[1]}')
 print(f'ENFORCE_TDD={str(config.enforce_tdd).lower()}')
 print(f'VALIDATION_FREQ={config.validation_frequency}')
-print(f'SKIP_RESEARCH={str(config.skip_common_research).lower()}')
 " > /tmp/adaptive_config.env
 
 # Source the configuration
@@ -91,9 +90,9 @@ echo "✅ Project Analysis Complete:"
 echo "   Complexity: $COMPLEXITY"
 echo "   Type: $PROJECT_TYPE"
 echo "   Max MVP Features: $MAX_FEATURES"
-echo "   Research Agents: $RESEARCH_AGENTS"
 echo "   Tasks per Milestone: $MILESTONE_MIN-$MILESTONE_MAX"
 echo "   TDD Required: $ENFORCE_TDD"
+echo "   Research: Dynamic (based on PRD analysis)"
 ```
 
 ## Adaptive Workflow Phases
@@ -151,12 +150,11 @@ config_items = [
     ('project_complexity', '$COMPLEXITY'),
     ('project_type', '$PROJECT_TYPE'),
     ('max_mvp_features', '$MAX_FEATURES'),
-    ('research_agents_count', '$RESEARCH_AGENTS'),
     ('tasks_per_milestone_min', '$MILESTONE_MIN'),
     ('tasks_per_milestone_max', '$MILESTONE_MAX'),
     ('validation_frequency', '$VALIDATION_FREQ'),
     ('enforce_tdd', '$ENFORCE_TDD'),
-    ('skip_common_research', '$SKIP_RESEARCH'),
+    ('research_mode', 'dynamic'),  # Research opportunities selected dynamically
     ('scaling_rationale', f'$COMPLEXITY complexity $PROJECT_TYPE project with adaptive scaling')
 ]
 
@@ -170,112 +168,121 @@ print('✅ Configuration stored in database')
 "
 ```
 
-### Phase 2A — Adaptive Research (MODIFIED)
+### Phase 2A — Technology Research
 
-**Smart Research Orchestration:**
+**CRITICAL INSTRUCTION:** Now perform technology research following the research protocol.
 
-```bash
-# Get research configuration
-echo "🔍 Configuring research based on complexity..."
+The research module uses a three-phase approach:
+1. **Foundation** - Analyze PRD for explicit tech mentions, select research opportunities
+2. **Parallel Research** - Launch subagents for each selected opportunity
+3. **Review & Reconciliation** - Verify coherence, resolve conflicts, commit to database
 
-if [[ "$RESEARCH_AGENTS" == "0" ]]; then
-    echo "⚡ MICRO/SCRIPT project - Skipping research phase"
-    echo "Using common technology defaults"
+**Research Execution (Prose-Orchestration):**
 
-    # Insert default tech stack for micro projects
-    python3 -c "
-import sys
-sys.path.append('$IRIS_DIR/utils')
-from database.db_manager import DatabaseManager
+**CRITICAL:** Use the Read tool to read the file at `$IRIS_DIR/research.md`, then execute its instructions inline as part of this planning session. This is prose-orchestration: you (Claude) read the .md file and follow its instructions directly—there is no subprocess or separate invocation. The PRD content from `$ARGUMENTS` is already in your context.
 
-db = DatabaseManager()
-with db.get_connection() as conn:
-    conn.execute('''
-        INSERT INTO technologies (name, category, version, decision_reason)
-        VALUES ('Python', 'language', '3.9+', 'Default for micro projects')
-    ''')
-    conn.commit()
-    print('✅ Default technology stack applied')
-"
-    RESEARCH_DONE="true"
-fi
-```
+The research process will:
 
-**If research agents are needed (`$RESEARCH_AGENTS > 0`), execute research phase:**
+1. Analyze the PRD (`$ARGUMENTS`) for explicit technology choices
+2. Detect project type and constraints
+3. Select applicable research opportunities from the catalog based on what's NOT specified
+4. Build a research context with all known information
+5. Launch parallel `general-purpose` subagents for each selected opportunity
+6. Each subagent uses WebSearch and WebFetch to find current, verified information
+7. Review all results for coherence and conflicts
+8. Commit the approved technology stack to the database
 
-When the complexity analysis indicates research is needed, you must launch research sub-agents using the Task tool.
+**For MICRO/SCRIPT projects with minimal complexity:**
 
-**IMPORTANT INSTRUCTION:** If `$RESEARCH_AGENTS` is greater than 0, you MUST invoke the Task tool multiple times IN PARALLEL (in a single response) to research the technology stack. The number of agents depends on complexity:
-
-**For SMALL complexity (2 agents):**
-- Launch **SA-1-LANG** (Programming Language) and **SA-3-TEST** (Testing Strategy)
-
-**For MEDIUM complexity (4 agents):**
-- Launch SA-1-LANG, SA-2-ARCH (Architecture), SA-3-TEST, SA-4 (type-specific: Frontend/API/CLI)
-
-**For LARGE/ENTERPRISE complexity (6-8 agents):**
-- Launch all applicable agents based on project type
-
-**Research Agent Specifications:**
-
-Each agent should be invoked with `subagent_type: "Explore"` and these prompts:
-
-| Agent ID | Description | Search Topics |
-|----------|-------------|---------------|
-| SA-1-LANG | Language Selection | "best {project_type} programming languages", "language comparison" |
-| SA-2-ARCH | Architecture Patterns | "{project_type} architecture patterns", "best practices" |
-| SA-3-TEST | Testing Strategy | "testing frameworks {project_type}", "TDD best practices" |
-| SA-4-FRONTEND | Frontend Framework | "best frontend frameworks", "React vs Vue vs Angular" |
-| SA-5-BACKEND | Backend Framework | "backend frameworks comparison", "API development" |
-| SA-6-DATABASE | Database Selection | "database comparison", "SQL vs NoSQL" |
-
-**Expected return format from each agent:**
-```json
-{
-    "agent_id": "SA-X-NAME",
-    "recommendation": "<technology>",
-    "version": "<version>",
-    "sources": ["<url1>", "<url2>"],
-    "justification": "<reasoning>"
-}
-```
-
-**After all research agents complete, store results in database:**
+If complexity analysis indicates a very simple project where research would be overhead:
 
 ```bash
-# Store research results in database
-echo "Processing research results..."
+# For MICRO projects - minimal research
+echo "⚡ Simple project - Applying minimal research..."
 
 python3 -c "
 import sys
-from datetime import datetime
 sys.path.append('$IRIS_DIR/utils')
 from database.db_manager import DatabaseManager
 
 db = DatabaseManager()
 with db.get_connection() as conn:
-    # Mark research as complete
+    # Insert minimal research opportunity
     conn.execute('''
-        INSERT OR REPLACE INTO project_metadata (key, value)
-        VALUES ('research_completed', ?)
-    ''', (datetime.now().isoformat(),))
+        INSERT INTO research_opportunities (id, category, name, research_question, status)
+        VALUES ('OPS_TESTING', 'ops', 'Testing Strategy', 'What testing approach for this project?', 'pending')
+    ''')
     conn.commit()
-    print('✅ Research phase marked complete in database')
+    print('✅ Minimal research opportunity queued')
 "
 ```
 
-**IMPORTANT:** After receiving results from the Task tool invocations, you must:
-1. Extract the recommended technologies from each agent's response
-2. Store them in the database using SQL INSERT statements into the `technologies` table
-3. Continue to Phase 3A (Milestone Creation)
+Even MICRO projects should verify testing approach and language version.
 
-**Conditional Research Execution:**
+**For all other projects:**
 
-- **MICRO projects**: Skip research entirely, use defaults
-- **SMALL projects**: 2 essential agents (language + testing)
-- **MEDIUM projects**: 4 core agents (+ architecture + type-specific)
-- **LARGE projects**: 6+ specialized agents (+ database + frontend)
-- **ENTERPRISE projects**: All 8 agents + compliance/security
+Execute the full research protocol:
+
+1. **Phase 1 (Foundation):** Analyze PRD, select opportunities, build context
+2. **Phase 2 (Parallel Research):** Launch subagents with `subagent_type: "general-purpose"`
+3. **Phase 3 (Review):** Check coherence, resolve issues, commit stack
+
+**IMPORTANT:** The research module stores results directly to the database:
+- `research_opportunities` - Tracks what was researched
+- `research_executions` - Records subagent execution history
+- `technologies` - Stores the approved technology stack
+- `technology_sources` - Stores verification URLs
+
+**After research completes, verify the technology stack:**
+
+```bash
+# Verify research results
+echo "🔍 Verifying technology stack..."
+
+python3 -c "
+import sys
+sys.path.append('$IRIS_DIR/utils')
+from database.db_manager import DatabaseManager
+
+db = DatabaseManager()
+with db.get_connection() as conn:
+    # Check research status - MUST be 'completed'
+    status = conn.execute(\"SELECT value FROM project_metadata WHERE key = 'research_phase_status'\").fetchone()
+    status_value = status['value'] if status else 'NOT STARTED'
+    print(f'Research Status: {status_value}')
+
+    if status_value != 'completed':
+        print('❌ ERROR: Research phase not completed. Review research.md execution.')
+        sys.exit(1)
+
+    # List approved technologies
+    techs = conn.execute('SELECT name, category, version, confidence FROM technologies').fetchall()
+    print(f'Technologies Approved: {len(techs)}')
+    for t in techs:
+        print(f'   {t[\"category\"]}: {t[\"name\"]} {t[\"version\"]} ({t[\"confidence\"]})')
+
+    # Check for any low confidence items
+    low_conf = conn.execute(\"SELECT COUNT(*) as c FROM technologies WHERE confidence = 'LOW'\").fetchone()
+    if low_conf['c'] > 0:
+        print(f'⚠️  {low_conf[\"c\"]} technologies with LOW confidence - review recommended')
+
+    print('✅ Research verification passed')
+"
+```
+
+### Phase 2B — Research Documentation
+
+**Generate research documentation for transparency and debugging:**
+
+Use the Read tool to read `$IRIS_DIR/document.md` and invoke it with the `--research` flag to generate technology decision documentation.
+
+This creates a `TECH_DECISIONS.md` file that documents:
+- All research opportunities that were analyzed
+- Technology recommendations with rationale
+- Confidence levels and source URLs
+- Compatibility notes
+
+**Continue to Phase 3A (Milestone Creation) after research documentation completes.**
 
 ### Phase 3A — Adaptive Task & Milestone Creation (DATABASE)
 
@@ -490,11 +497,11 @@ esac
 - **Feature Scaling:** [SCALING_REASON] 
 - **Deferred Features:** [ACTUAL_DEFERRED_COUNT] (tracked in deferred_features table)
 
-### 🚀 Adaptive Research Execution
-- **Research Strategy:** [SKIP/CACHED/FULL] based on complexity
-- **Sub-Agents Spawned:** [ACTUAL_AGENT_COUNT] (optimal for [COMPLEXITY] projects)
-- **Research Time:** [ACTUAL_TIME] seconds ([EFFICIENCY_GAIN] vs standard Iris)
-- **Cached Decisions:** [CACHED_TECH_COUNT] technologies from cache
+### 🚀 Dynamic Research Execution
+- **Research Strategy:** Dynamic opportunity selection based on PRD analysis
+- **Opportunities Researched:** [OPPORTUNITY_COUNT] (selected based on PRD gaps)
+- **High Confidence:** [HIGH_CONF_COUNT] technologies verified from official sources
+- **Parallel Execution:** [AGENT_COUNT] subagents launched simultaneously
 
 ### 🏗️ Adaptive Architecture  
 - **Milestone Strategy:** [MILESTONE_MIN]-[MILESTONE_MAX] tasks per milestone
@@ -507,7 +514,9 @@ esac
   - **project_metadata table** - Framework scaling decisions and complexity analysis
   - **milestones table** - [ACTUAL_MILESTONE_COUNT] adaptive milestones with sizing strategy
   - **tasks table** - [ACTUAL_TASK_COUNT] tasks with adaptive metadata and scope boundaries
-  - **technologies table** - [CACHED_COUNT] cached + [RESEARCHED_COUNT] researched technologies
+  - **technologies table** - [TECH_COUNT] researched technologies with confidence levels
+  - **research_opportunities table** - [OPPORTUNITY_COUNT] opportunities tracked
+  - **research_executions table** - Subagent execution history for debugging
   - **task_dependencies table** - Task relationship mapping
 - **PROJECT_STATUS.md** - Auto-generated status summary
 - **backups/** - Automatic database backups with versioning
@@ -524,10 +533,10 @@ esac
 2. Validation frequency: [VALIDATION_FREQ] 
 3. Expected completion: [ESTIMATED_TIMELINE]
 
-### ⚡ Efficiency Gains  
-- **Setup Time:** [SETUP_TIME_SAVED] reduction vs full Iris
-- **Research Time:** [RESEARCH_TIME_SAVED] via intelligent caching
-- **Overhead Reduction:** [OVERHEAD_PERCENTAGE]% for [COMPLEXITY] projects
+### ⚡ Research Quality
+- **Source Verification:** Technologies verified from official documentation
+- **Compatibility Checked:** Stack coherence verified in reconciliation phase
+- **Confidence Tracking:** Each technology has HIGH/MEDIUM/LOW confidence rating
 ```
 
 ## Command Integration

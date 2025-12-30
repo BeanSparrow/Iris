@@ -2,6 +2,8 @@
 
 This document provides visual process flows for each IRIS command, showing expected inputs, outputs, and decision points.
 
+**Architecture Note:** IRIS uses a "prose-orchestration" approach where workflow coordination is embedded in natural language instructions within markdown files. Each `.md` command file contains instructions that Claude reads and follows directly. Modules can invoke each other inline (e.g., plan.md reads and executes research.md).
+
 ---
 
 ## Table of Contents
@@ -9,11 +11,12 @@ This document provides visual process flows for each IRIS command, showing expec
 1. [Command Overview & Relationships](#command-overview--relationships)
 2. [/iris:autopilot Flow](#irisautopilot-flow)
 3. [/iris:plan Flow](#irisplan-flow)
-4. [/iris:execute Flow](#irisexecute-flow)
-5. [/iris:validate Flow](#irisvalidate-flow)
-6. [/iris:document Flow](#irisdocument-flow)
-7. [/iris:audit Flow](#irisaudit-flow)
-8. [Database State Transitions](#database-state-transitions)
+4. [Research Module Flow](#research-module-flow)
+5. [/iris:execute Flow](#irisexecute-flow)
+6. [/iris:validate Flow](#irisvalidate-flow)
+7. [/iris:document Flow](#irisdocument-flow)
+8. [/iris:audit Flow](#irisaudit-flow)
+9. [Database State Transitions](#database-state-transitions)
 
 ---
 
@@ -22,6 +25,7 @@ This document provides visual process flows for each IRIS command, showing expec
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           IRIS COMMAND ECOSYSTEM                            │
+│                        (Prose-Orchestration Model)                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   ┌─────────────────────────────────────────────────────────────────────┐   │
@@ -35,14 +39,20 @@ This document provides visual process flows for each IRIS command, showing expec
 │   ┌─────────┐   ┌─────────┐   ┌──────────┐   ┌──────────┐                   │
 │   │  plan   │──▶│ execute │──▶│ validate │──▶│ document │                   │
 │   │(Phase 1)│   │(Phase 2)│   │(Phase 3) │   │(Phase 4) │                   │
-│   └─────────┘   └────┬────┘   └──────────┘   └────┬─────┘                   │
-│                      │                            │                         │
-│                      │◀───────────────────────────┘                         │
-│                      │     (loop per milestone)                             │
-│                      ▼                                                      │
-│                  ┌────────┐                                                 │
-│                  │  DONE  │                                                 │
-│                  └────────┘                                                 │
+│   └────┬────┘   └────┬────┘   └──────────┘   └────┬─────┘                   │
+│        │             │                            │                         │
+│        │             │◀───────────────────────────┘                         │
+│        │             │     (loop per milestone)                             │
+│        │             ▼                                                      │
+│        │         ┌────────┐                                                 │
+│        │         │  DONE  │                                                 │
+│        │         └────────┘                                                 │
+│        │                                                                    │
+│        │   PROSE-ORCHESTRATION (inline execution)                           │
+│        │   ┌─────────────────────────────────────────────┐                  │
+│        └──▶│  research.md ──▶ document.md --research    │                  │
+│            │  (3-phase)        (TECH_DECISIONS.md)      │                  │
+│            └─────────────────────────────────────────────┘                  │
 │                                                                             │
 │   ┌───────────────────────────────────────────────────────────────────┐     │
 │   │                     STANDALONE COMMANDS                           │     │
@@ -265,7 +275,7 @@ This document provides visual process flows for each IRIS command, showing expec
 │   │  ├── COMPLEXITY: micro | small | medium | large | enterprise       │   │
 │   │  ├── PROJECT_TYPE: web | api | cli | library | mobile             │   │
 │   │  ├── MAX_FEATURES: 2 | 3 | 7 | 10 | 15                            │   │
-│   │  ├── RESEARCH_AGENTS: 0 | 2 | 4 | 6 | 8                           │   │
+│   │  ├── RESEARCH_MODE: dynamic (PRD-driven opportunity selection)     │   │
 │   │  ├── TASKS_PER_MILESTONE: (min, max)                               │   │
 │   │  ├── ENFORCE_TDD: true | false                                     │   │
 │   │  └── VALIDATION_FREQUENCY: minimal | major | every | comprehensive │   │
@@ -292,61 +302,53 @@ This document provides visual process flows for each IRIS command, showing expec
 │   │  ├── project_complexity                                            │   │
 │   │  ├── project_type                                                  │   │
 │   │  ├── max_mvp_features                                              │   │
-│   │  ├── research_agents_count                                         │   │
+│   │  ├── research_mode: 'dynamic'                                      │   │
 │   │  ├── tasks_per_milestone_min/max                                   │   │
 │   │  ├── validation_frequency                                          │   │
-│   │  ├── enforce_tdd                                                   │   │
-│   │  └── skip_common_research                                          │   │
+│   │  └── enforce_tdd                                                   │   │
 │   └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
                     ┌───────────────────────────────┐
-                    │    RESEARCH_AGENTS > 0?       │
+                    │      COMPLEXITY CHECK         │
                     └───────────────────────────────┘
                            │              │
-                      yes  │              │ no (MICRO project)
+                    full   │              │ MICRO
                            ▼              │
 ┌──────────────────────────────────────┐  │
-│      PHASE 2A: RESEARCH              │  │
+│   PHASE 2A: DYNAMIC RESEARCH         │  │
+│   (Prose-Orchestration)              │  │
 ├──────────────────────────────────────┤  │
 │                                      │  │
 │  ┌────────────────────────────────┐  │  │
-│  │ Launch Research Sub-Agents     │  │  │
-│  │ (parallel Task tool calls)     │  │  │
+│  │ Read and execute research.md   │  │  │
+│  │ (inline, same Claude instance) │  │  │
 │  │                                │  │  │
-│  │ SMALL (2 agents):              │  │  │
-│  │ ├── SA-1-LANG (Language)       │  │  │
-│  │ └── SA-3-TEST (Testing)        │  │  │
-│  │                                │  │  │
-│  │ MEDIUM (4 agents):             │  │  │
-│  │ ├── SA-1-LANG                  │  │  │
-│  │ ├── SA-2-ARCH (Architecture)   │  │  │
-│  │ ├── SA-3-TEST                  │  │  │
-│  │ └── SA-4-* (Type-specific)     │  │  │
-│  │                                │  │  │
-│  │ LARGE/ENTERPRISE (6-8 agents): │  │  │
-│  │ ├── All above +                │  │  │
-│  │ ├── SA-5-BACKEND               │  │  │
-│  │ ├── SA-6-DATABASE              │  │  │
-│  │ └── SA-7/8 (Compliance/Sec)    │  │  │
+│  │ See: Research Module Flow      │  │  │
+│  │ below for detailed phases      │  │  │
 │  └────────────────────────────────┘  │  │
 │             │                        │  │
 │             ▼                        │  │
 │  ┌────────────────────────────────┐  │  │
-│  │ Store Research Results         │  │  │
-│  │ INSERT INTO technologies       │  │  │
-│  │ (name, category, version,      │  │  │
-│  │  decision_reason, sources)     │  │  │
+│  │ Verify research_phase_status   │  │  │
+│  │ = 'completed'                  │  │  │
+│  └────────────────────────────────┘  │  │
+│             │                        │  │
+│             ▼                        │  │
+│  ┌────────────────────────────────┐  │  │
+│  │ PHASE 2B: Research Docs        │  │  │
+│  │ document.md --research         │  │  │
+│  │ → TECH_DECISIONS.md            │  │  │
 │  └────────────────────────────────┘  │  │
 │                                      │  │
 └──────────────────────────────────────┘  │
                            │              │
                            │              ▼
                            │   ┌──────────────────────────┐
-                           │   │ Apply Default Tech Stack │
-                           │   │ Python 3.9+ for MICRO   │
+                           │   │ Minimal research         │
+                           │   │ (OPS_TESTING only)       │
                            │   └──────────────────────────┘
                            │              │
                            └──────┬───────┘
@@ -440,11 +442,207 @@ This document provides visual process flows for each IRIS command, showing expec
 
 | Table | Records Created |
 |-------|-----------------|
-| `project_metadata` | ~10 configuration keys |
+| `project_metadata` | ~10 configuration keys + research context |
 | `milestones` | 2-5 milestones |
 | `tasks` | 5-60+ tasks (based on complexity) |
-| `technologies` | 1-10+ technology decisions |
+| `research_opportunities` | N opportunities (dynamic based on PRD) |
+| `research_executions` | N execution records (debugging) |
+| `technologies` | 1-10+ technology decisions with confidence |
+| `technology_sources` | Verification URLs for each technology |
 | `project_state` | current_milestone_id set |
+
+| File Output | Description |
+|-------------|-------------|
+| `TECH_DECISIONS.md` | Technology research summary for transparency |
+
+---
+
+## Research Module Flow
+
+**Purpose:** Dynamic technology research driven by PRD analysis. Not a standalone command—invoked inline by plan.md via prose-orchestration.
+
+**Invoked by:** `/iris:plan` (Phase 2A)
+**Output:** Populated research tables, approved technology stack, TECH_DECISIONS.md
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    RESEARCH MODULE (research.md)                            │
+│                    Invoked inline by plan.md                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 1: FOUNDATION                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Step 1.1: Analyze PRD for Explicit Technologies                   │   │
+│   │  ├── Language specified?                                           │   │
+│   │  ├── Framework specified?                                          │   │
+│   │  └── Database specified?                                           │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Step 1.2: Detect Project Type                                     │   │
+│   │  ├── web_app | web_api | cli_tool | library | mobile | other       │   │
+│   │  ├── Has frontend? Has backend? Has database? Has auth?            │   │
+│   │  └── Deployment target?                                            │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Step 1.3: Select Research Opportunities                           │   │
+│   │                                                                     │   │
+│   │  OPPORTUNITY CATALOG (35+ available):                              │   │
+│   │  ├── Stack: STACK_LANG, STACK_FRAMEWORK_*, STACK_DATABASE, etc.   │   │
+│   │  ├── Version: VERSION_LANG, VERSION_FRAMEWORK, COMPAT_MATRIX      │   │
+│   │  ├── Architecture: ARCH_PATTERN, ARCH_API_DESIGN, ARCH_STATE_MGMT │   │
+│   │  ├── Ops: OPS_TESTING, OPS_CI_CD, OPS_MONITORING, OPS_SECURITY    │   │
+│   │  └── Custom: CUSTOM (for PRD-specific needs)                       │   │
+│   │                                                                     │   │
+│   │  Selection Rules:                                                   │   │
+│   │  ├── Skip if PRD explicitly specifies technology                  │   │
+│   │  ├── Always include OPS_TESTING                                    │   │
+│   │  └── Include VERSION_* for all selected/specified tech            │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Step 1.4-1.5: Build Context & Store                               │   │
+│   │  ├── Create research_context JSON                                  │   │
+│   │  ├── INSERT INTO project_metadata                                  │   │
+│   │  └── INSERT INTO research_opportunities (each selected)           │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 2: PARALLEL RESEARCH                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Step 2.1: Prepare Subagent Prompts                                │   │
+│   │  ├── Include research_context JSON                                 │   │
+│   │  ├── Include opportunity ID and research question                  │   │
+│   │  └── Specify output format (RECOMMENDATION, VERSION, SOURCE, etc.) │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Step 2.2: Launch Parallel Research Agents                         │   │
+│   │                                                                     │   │
+│   │  CRITICAL: ALL agents launched in SINGLE message                   │   │
+│   │                                                                     │   │
+│   │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │   │
+│   │  │  Task    │  │  Task    │  │  Task    │  │  Task    │  ...       │   │
+│   │  │  Agent   │  │  Agent   │  │  Agent   │  │  Agent   │            │   │
+│   │  │ STACK_*  │  │ OPS_*    │  │VERSION_* │  │ ARCH_*   │            │   │
+│   │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘            │   │
+│   │       │             │             │             │                   │   │
+│   │       │  subagent_type: "general-purpose"       │                   │   │
+│   │       │  Tools: WebSearch, WebFetch, Read, etc. │                   │   │
+│   │       │             │             │             │                   │   │
+│   │       ▼             ▼             ▼             ▼                   │   │
+│   │  ┌─────────────────────────────────────────────────────────────┐    │   │
+│   │  │                 PARALLEL EXECUTION                          │    │   │
+│   │  └─────────────────────────────────────────────────────────────┘    │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Step 2.3-2.4: Collect & Store Results                             │   │
+│   │  ├── Parse: RECOMMENDATION, VERSION, SOURCE, CONFIDENCE           │   │
+│   │  ├── INSERT INTO research_executions                               │   │
+│   │  └── UPDATE research_opportunities SET status = 'completed'       │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 3: REVIEW & RECONCILIATION                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Step 3.1: Aggregate Results                                       │   │
+│   │                                                                     │   │
+│   │  ┌───────────────────┬──────────────┬─────────┬────────────┐        │   │
+│   │  │ Opportunity       │ Recommendation│ Version │ Confidence │        │   │
+│   │  ├───────────────────┼──────────────┼─────────┼────────────┤        │   │
+│   │  │ STACK_FRAMEWORK   │ FastAPI      │ 0.109.0 │ HIGH       │        │   │
+│   │  │ OPS_TESTING       │ pytest       │ 8.0.0   │ HIGH       │        │   │
+│   │  │ ...               │ ...          │ ...     │ ...        │        │   │
+│   │  └───────────────────┴──────────────┴─────────┴────────────┘        │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Step 3.2: Check for Issues                                        │   │
+│   │  ├── Coherence: Do all technologies work together?                 │   │
+│   │  ├── Conflicts: Contradictory assumptions? Version mismatches?     │   │
+│   │  ├── Gaps: Missing critical decisions?                             │   │
+│   │  └── Confidence: Any LOW confidence needing re-research?           │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│              ┌─────────────────────┴─────────────────────┐                  │
+│              │                                           │                  │
+│         issues found                               no issues                │
+│              │                                           │                  │
+│              ▼                                           │                  │
+│   ┌──────────────────────────────┐                       │                  │
+│   │  Step 3.3: Resolve Issues    │                       │                  │
+│   │  ├── Minor: Planner judgment │                       │                  │
+│   │  ├── Gaps: Follow-up research│                       │                  │
+│   │  ├── Conflicts: Best fit     │                       │                  │
+│   │  └── Low conf: Re-research   │                       │                  │
+│   └──────────────────────────────┘                       │                  │
+│              │                                           │                  │
+│              └───────────────────┬───────────────────────┘                  │
+│                                  │                                          │
+│                                  ▼                                          │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Step 3.4-3.5: Commit Stack & Update Status                        │   │
+│   │  ├── INSERT INTO technologies (with confidence, alternatives)      │   │
+│   │  ├── INSERT INTO technology_sources (verification URLs)           │   │
+│   │  └── UPDATE project_metadata SET research_phase_status='completed'│   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │     RESEARCH COMPLETE         │
+                    │                               │
+                    │  Output: Research Summary     │
+                    │  Control returns to plan.md   │
+                    └───────────────────────────────┘
+```
+
+### Research Outputs
+
+| Database Table | Records Created |
+|----------------|-----------------|
+| `project_metadata` | Research context keys |
+| `research_opportunities` | N opportunities selected from catalog |
+| `research_executions` | N execution records (for debugging) |
+| `technologies` | Approved stack with confidence levels |
+| `technology_sources` | Verification URLs |
+
+| File Output | Description |
+|-------------|-------------|
+| `TECH_DECISIONS.md` | Human-readable research summary (via document.md --research) |
+
+### Research Opportunity Categories
+
+| Category | Examples | When Selected |
+|----------|----------|---------------|
+| **Stack** | STACK_LANG, STACK_FRAMEWORK_API, STACK_DATABASE | PRD doesn't specify |
+| **Version** | VERSION_LANG, VERSION_FRAMEWORK, COMPAT_MATRIX | Always for selected tech |
+| **Architecture** | ARCH_PATTERN, ARCH_API_DESIGN, ARCH_STATE_MGMT | Non-trivial projects |
+| **Ops** | OPS_TESTING, OPS_CI_CD, OPS_MONITORING | OPS_TESTING always; others as needed |
+| **Custom** | CUSTOM | PRD has unique needs |
 
 ---
 
@@ -553,12 +751,12 @@ This document provides visual process flows for each IRIS command, showing expec
 │   │                    TDD EXECUTION CYCLE                            │     │
 │   │  ┌──────────────────────────────────────────────────────────────┐ │     │
 │   │  │                                                              │ │     │
-│   │  │   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │ │     │
+│   │  │   ┌─────────────┐     ┌─────────────┐    ┌─────────────┐     │ │     │
 │   │  │   │    RED      │───▶│   GREEN     │───▶│  REFACTOR   │     │ │     │
-│   │  │   │             │    │             │    │             │     │ │     │
-│   │  │   │ Write tests │    │ Write code  │    │ Clean up    │     │ │     │
-│   │  │   │ (failing)   │    │ (pass tests)│    │ (tests pass)│     │ │     │
-│   │  │   └─────────────┘    └─────────────┘    └─────────────┘     │ │     │
+│   │  │   │             │     │             │    │             │     │ │     │
+│   │  │   │ Write tests │     │ Write code  │    │ Clean up    │     │ │     │
+│   │  │   │ (failing)   │     │ (pass tests)│    │ (tests pass)│     │ │     │
+│   │  │   └─────────────┘     └─────────────┘    └─────────────┘     │ │     │
 │   │  │                                                              │ │     │
 │   │  └──────────────────────────────────────────────────────────────┘ │     │
 │   └───────────────────────────────────────────────────────────────────┘     │
@@ -807,8 +1005,8 @@ This document provides visual process flows for each IRIS command, showing expec
 
 **Purpose:** Generate and maintain project documentation. Can run standalone or as part of the autopilot loop.
 
-**Input:** Optional flags: `--standalone`, `--milestone <id>`, `--final`
-**Output:** README.md, PROJECT_STATUS.md, COMPLETION_REPORT.md (on final)
+**Input:** Optional flags: `--standalone`, `--research`, `--milestone <id>`, `--final`
+**Output:** README.md, PROJECT_STATUS.md, TECH_DECISIONS.md (research), COMPLETION_REPORT.md (final)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -891,6 +1089,7 @@ This document provides visual process flows for each IRIS command, showing expec
 |--------|----------------|-------------|
 | `README.md` | Every run | Project documentation with features, install, usage |
 | `PROJECT_STATUS.md` | Every run | Current progress, milestones, tasks |
+| `TECH_DECISIONS.md` | `--research` only | Technology research summary with rationale |
 | `COMPLETION_REPORT.md` | `--final` only | Full KPI report with metrics |
 
 ### Terminal Output (Final Mode)
@@ -1265,12 +1464,22 @@ This diagram shows how the database state changes throughout the IRIS lifecycle.
 | Command | Primary Purpose | Key Input | Key Output |
 |---------|-----------------|-----------|------------|
 | `/iris:autopilot` | End-to-end autonomous development | PRD or "resume" | Working application |
-| `/iris:plan` | Create adaptive sprint plan | PRD text | Populated database |
+| `/iris:plan` | Create adaptive sprint plan | PRD text | Populated database + TECH_DECISIONS.md |
+| `research.md` | Dynamic technology research | Invoked inline by plan.md | technologies table, research_* tables |
 | `/iris:execute` | Implement individual tasks | Task ID (optional) | Code + completed task |
 | `/iris:validate` | Verify milestone completion | Milestone ID (optional) | Validation report |
-| `/iris:document` | Generate/update documentation | Flags (optional) | README, STATUS, REPORT |
+| `/iris:document` | Generate/update documentation | Flags (optional) | README, STATUS, TECH_DECISIONS, REPORT |
 | `/iris:audit` | Security analysis | Scope (optional) | Security report |
+
+### Document Command Flags
+
+| Flag | Purpose |
+|------|---------|
+| `--standalone` | Analyze existing project without IRIS database |
+| `--research` | Generate TECH_DECISIONS.md from research results |
+| `--milestone <id>` | Update docs for specific milestone |
+| `--final` | Generate COMPLETION_REPORT.md with KPIs |
 
 ---
 
-*Document generated for IRIS Framework v1.1*
+*Document generated for IRIS Framework v2.0 (Prose-Orchestration Architecture)*
