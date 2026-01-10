@@ -1,6 +1,13 @@
 -- Iris Project Database Schema
 -- Replaces JSON-based project tracking with SQLite relational database
--- Version: 1.0.0
+-- Version: 2.0.0
+--
+-- Changes in 2.0.0:
+--   - Added research_opportunities table for dynamic research tracking
+--   - Added research_executions table for subagent execution history
+--   - Extended technologies table with opportunity linking and confidence
+--   - Extended technology_sources table with fetch tracking
+--   - Updated project_metadata to support research category system
 
 -- Enable foreign key constraints
 PRAGMA foreign_keys = ON;
@@ -57,17 +64,53 @@ CREATE TABLE IF NOT EXISTS task_dependencies (
     FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id) ON DELETE CASCADE
 );
 
+-- Research opportunities catalog and tracking
+-- Tracks which research opportunities were selected and their outcomes
+CREATE TABLE IF NOT EXISTS research_opportunities (
+    id TEXT PRIMARY KEY,                    -- STACK_LANG, VERSION_DEPS, OPS_TESTING, etc.
+    category TEXT NOT NULL,                 -- stack, version, architecture, ops, custom
+    name TEXT NOT NULL,                     -- Human-readable name
+    research_question TEXT,                 -- The question being researched
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, in_progress, completed, skipped
+    result_summary TEXT,                    -- Brief summary of findings
+    confidence TEXT,                        -- HIGH, MEDIUM, LOW
+    researched_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Research execution history
+-- Tracks subagent executions for debugging and audit
+CREATE TABLE IF NOT EXISTS research_executions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    opportunity_id TEXT NOT NULL,
+    execution_status TEXT NOT NULL,         -- started, completed, failed, retrying
+    subagent_prompt TEXT,                   -- The prompt sent to subagent
+    subagent_response TEXT,                 -- Full response (kept concise via prompt requirements)
+    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed_at DATETIME,
+    error_message TEXT,
+    retry_count INTEGER DEFAULT 0,
+    FOREIGN KEY (opportunity_id) REFERENCES research_opportunities(id) ON DELETE CASCADE
+);
+
 -- Approved technology stack (replaces techstack_research.json)
 CREATE TABLE IF NOT EXISTS technologies (
     name TEXT PRIMARY KEY,
-    category TEXT,  -- language, framework, database, testing, etc.
+    category TEXT,                          -- language, framework, database, testing, etc.
     version TEXT,
     is_latest_stable BOOLEAN DEFAULT FALSE,
     official_url TEXT,
     last_verified DATETIME,
     needs_verification BOOLEAN DEFAULT FALSE,
     decision_reason TEXT,
-    added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    -- New columns for research integration
+    opportunity_id TEXT,                    -- Links to research_opportunities.id
+    confidence TEXT,                        -- HIGH, MEDIUM, LOW
+    alternatives TEXT,                      -- JSON array: ["Vue", "Svelte"]
+    compatibility_notes TEXT,               -- Notes on compatibility with other stack items
+    source_type TEXT,                       -- explicit_prd, researched, default
+    FOREIGN KEY (opportunity_id) REFERENCES research_opportunities(id) ON DELETE SET NULL
 );
 
 -- Technology research sources
@@ -78,6 +121,10 @@ CREATE TABLE IF NOT EXISTS technology_sources (
     published_date DATE,
     relevance TEXT,
     notes TEXT,
+    -- New columns for fetch tracking
+    source_type TEXT,                       -- official_docs, blog, comparison, release_notes
+    was_fetched BOOLEAN DEFAULT FALSE,      -- Did we actually fetch and verify this URL?
+    fetch_timestamp DATETIME,               -- When was it fetched?
     FOREIGN KEY (technology_name) REFERENCES technologies(name) ON DELETE CASCADE
 );
 
@@ -159,9 +206,15 @@ CREATE INDEX IF NOT EXISTS idx_executions_task ON task_executions(task_id);
 CREATE INDEX IF NOT EXISTS idx_validations_milestone ON milestone_validations(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_project_state_key ON project_state(key);
 
+-- Research-related indexes
+CREATE INDEX IF NOT EXISTS idx_research_opp_status ON research_opportunities(status);
+CREATE INDEX IF NOT EXISTS idx_research_opp_category ON research_opportunities(category);
+CREATE INDEX IF NOT EXISTS idx_tech_opportunity ON technologies(opportunity_id);
+CREATE INDEX IF NOT EXISTS idx_research_exec_opp ON research_executions(opportunity_id);
+
 -- Schema version tracking
-INSERT OR REPLACE INTO project_metadata (key, value) 
-VALUES ('schema_version', '1.0.0');
+INSERT OR REPLACE INTO project_metadata (key, value)
+VALUES ('schema_version', '2.0.0');
 
 INSERT OR REPLACE INTO project_metadata (key, value) 
 VALUES ('database_created', datetime('now'));

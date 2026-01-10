@@ -8,11 +8,11 @@ description: "Usage: /iris:help - Display Iris framework overview and commands"
 
 ```
 ●
-   ██ ██████  ██ ███████   
-   ██ ██   ██ ██ ██        
-   ██ ██████  ██ ███████   
-   ██ ██   ██ ██      ██   
-   ██ ██   ██ ██ ███████   
+   ██ ██████  ██ ███████
+   ██ ██   ██ ██ ██
+   ██ ██████  ██ ███████
+   ██ ██   ██ ██      ██
+   ██ ██   ██ ██ ███████
 
            Autonomous Development Engine
            ------------------------------
@@ -46,7 +46,22 @@ IRIS transforms ideas into working applications autonomously. Provide requiremen
 4. Document: /iris:document
 5. Audit: /iris:audit
 
-IRIS Autopilot uses adaptive complexity scaling, continuous execution, intelligent error recovery, and real-time documentation to deliver production-ready applications autonomously.
+## 📚 Document Command Flags
 
-Peace.
+--standalone    Analyze existing project without IRIS database
+--research      Generate TECH_DECISIONS.md from research results
+--milestone M1  Update docs for specific milestone
+--final         Generate COMPLETION_REPORT.md with KPIs
+
+## 🔬 How Research Works
+
+IRIS uses dynamic, PRD-driven research with prose-orchestration:
+
+1. Foundation   - Analyze PRD, select research opportunities
+2. Parallel     - Launch subagents to research technologies
+3. Reconcile    - Verify coherence, commit approved stack
+
+Research output: TECH_DECISIONS.md (technology choices with rationale)
+
+IRIS uses adaptive complexity scaling, prose-orchestration, and dynamic research to deliver prototypes autonomously.
 ```

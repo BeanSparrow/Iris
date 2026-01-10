@@ -1,5 +1,8 @@
 # Iris Database Architecture
 
+**Schema Version:** 2.0.0
+**Last Updated:** 2024-12-30
+
 ## Overview
 
 Iris uses a **SQLite backend** that provides transactional project management with atomic operations and data integrity. This document outlines the schema design and architectural decisions.
@@ -75,14 +78,21 @@ CREATE TABLE task_dependencies (
 ```sql
 CREATE TABLE technologies (
     name TEXT PRIMARY KEY,
-    category TEXT,  -- language, framework, database, testing, etc.
+    category TEXT,                          -- language, framework, database, testing, etc.
     version TEXT,
     is_latest_stable BOOLEAN DEFAULT FALSE,
     official_url TEXT,
     last_verified DATETIME,
     needs_verification BOOLEAN DEFAULT FALSE,
     decision_reason TEXT,
-    added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    -- Research integration columns (added in v2.0.0)
+    opportunity_id TEXT,                    -- Links to research_opportunities.id
+    confidence TEXT,                        -- HIGH, MEDIUM, LOW
+    alternatives TEXT,                      -- JSON array: ["Vue", "Svelte"]
+    compatibility_notes TEXT,               -- Notes on compatibility with other stack items
+    source_type TEXT,                       -- explicit_prd, researched, default
+    FOREIGN KEY (opportunity_id) REFERENCES research_opportunities(id) ON DELETE SET NULL
 );
 ```
 
@@ -92,6 +102,50 @@ CREATE TABLE project_metadata (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Research Tables (Added in v2.0.0)
+
+#### **research_opportunities**
+Tracks which research opportunities were selected and their outcomes.
+```sql
+CREATE TABLE research_opportunities (
+    id TEXT PRIMARY KEY,                    -- STACK_LANG, VERSION_DEPS, OPS_TESTING, etc.
+    category TEXT NOT NULL,                 -- stack, version, architecture, ops, custom
+    name TEXT NOT NULL,                     -- Human-readable name
+    research_question TEXT,                 -- The question being researched
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, in_progress, completed, skipped
+    result_summary TEXT,                    -- Brief summary of findings
+    confidence TEXT,                        -- HIGH, MEDIUM, LOW
+    researched_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Category Values:**
+| Category | Description | Example Opportunity IDs |
+|----------|-------------|------------------------|
+| `stack` | Technology stack selection | STACK_LANG, STACK_FRAMEWORK_UI, STACK_DATABASE |
+| `version` | Version and compatibility | VERSION_LANG, VERSION_DEPS, COMPAT_MATRIX |
+| `architecture` | Architecture patterns | ARCH_PATTERN, ARCH_API_DESIGN, ARCH_STATE_MGMT |
+| `ops` | Operational concerns | OPS_TESTING, OPS_CI_CD, OPS_MONITORING |
+| `custom` | Custom research needs | CUSTOM (dynamic) |
+
+#### **research_executions**
+Tracks subagent executions for debugging and audit.
+```sql
+CREATE TABLE research_executions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    opportunity_id TEXT NOT NULL,
+    execution_status TEXT NOT NULL,         -- started, completed, failed, retrying
+    subagent_prompt TEXT,                   -- The prompt sent to subagent
+    subagent_response TEXT,                 -- Full response (kept concise via prompt requirements)
+    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed_at DATETIME,
+    error_message TEXT,
+    retry_count INTEGER DEFAULT 0,
+    FOREIGN KEY (opportunity_id) REFERENCES research_opportunities(id) ON DELETE CASCADE
 );
 ```
 
@@ -106,6 +160,10 @@ CREATE TABLE technology_sources (
     published_date DATE,
     relevance TEXT,
     notes TEXT,
+    -- Fetch tracking columns (added in v2.0.0)
+    source_type TEXT,                       -- official_docs, blog, comparison, release_notes
+    was_fetched BOOLEAN DEFAULT FALSE,      -- Did we actually fetch and verify this URL?
+    fetch_timestamp DATETIME,               -- When was it fetched?
     FOREIGN KEY (technology_name) REFERENCES technologies(name) ON DELETE CASCADE
 );
 ```
@@ -197,7 +255,7 @@ CREATE TABLE milestone_validations (
 ### Indexes for Performance
 
 ```sql
--- Query optimization indexes
+-- Query optimization indexes (Core)
 CREATE INDEX idx_tasks_milestone ON tasks(milestone_id);
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_task_deps_task ON task_dependencies(task_id);
@@ -205,6 +263,12 @@ CREATE INDEX idx_task_deps_depends ON task_dependencies(depends_on_task_id);
 CREATE INDEX idx_executions_task ON task_executions(task_id);
 CREATE INDEX idx_validations_milestone ON milestone_validations(milestone_id);
 CREATE INDEX idx_project_state_key ON project_state(key);
+
+-- Research-related indexes (added in v2.0.0)
+CREATE INDEX idx_research_opp_status ON research_opportunities(status);
+CREATE INDEX idx_research_opp_category ON research_opportunities(category);
+CREATE INDEX idx_tech_opportunity ON technologies(opportunity_id);
+CREATE INDEX idx_research_exec_opp ON research_executions(opportunity_id);
 ```
 
 ## 🏗️ Architecture Components
@@ -368,14 +432,110 @@ END;
 - **Task ordering**: Must be sequential within milestones
 - **Dependency validity**: No dangling or circular references
 
+## 🔬 Research Data Flow (v2.0.0)
+
+The research system uses three tables to track the complete research lifecycle:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     RESEARCH FLOW                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Planner selects opportunities from catalog                 │
+│     │                                                          │
+│     ▼                                                          │
+│  ┌─────────────────────────────────┐                          │
+│  │   research_opportunities        │  Status: pending         │
+│  │   - STACK_LANG                  │                          │
+│  │   - STACK_FRAMEWORK_API         │                          │
+│  │   - OPS_TESTING                 │                          │
+│  └─────────────────────────────────┘                          │
+│     │                                                          │
+│     ▼                                                          │
+│  2. Subagents execute research (parallel)                      │
+│     │                                                          │
+│     ▼                                                          │
+│  ┌─────────────────────────────────┐                          │
+│  │   research_executions           │  Tracks each attempt     │
+│  │   - subagent_prompt             │                          │
+│  │   - subagent_response           │                          │
+│  │   - execution_status            │                          │
+│  └─────────────────────────────────┘                          │
+│     │                                                          │
+│     ▼                                                          │
+│  3. Results stored with source tracking                        │
+│     │                                                          │
+│     ▼                                                          │
+│  ┌─────────────────────────────────┐                          │
+│  │   technologies                  │  Final approved stack    │
+│  │   - opportunity_id (link)       │                          │
+│  │   - confidence                  │                          │
+│  │   - alternatives                │                          │
+│  │   - source_type                 │                          │
+│  └─────────────────────────────────┘                          │
+│     │                                                          │
+│     ▼                                                          │
+│  ┌─────────────────────────────────┐                          │
+│  │   technology_sources            │  Verification URLs       │
+│  │   - was_fetched                 │                          │
+│  │   - fetch_timestamp             │                          │
+│  │   - source_type                 │                          │
+│  └─────────────────────────────────┘                          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Research Context Storage
+
+Research context (shared state for parallel subagents) is stored in `project_metadata`:
+
+| Key | Example Value | Description |
+|-----|---------------|-------------|
+| `research_context_project_type` | `web_api` | Detected project type |
+| `research_context_language` | `python` | Selected/detected language |
+| `research_context_constraints` | `["must use postgresql"]` | PRD constraints (JSON) |
+| `research_phase_status` | `completed` | Current research phase |
+
+### Example Queries
+
+**Get all pending research opportunities:**
+```sql
+SELECT id, name, research_question
+FROM research_opportunities
+WHERE status = 'pending';
+```
+
+**Get technology with its research source:**
+```sql
+SELECT t.name, t.version, t.confidence, ro.research_question
+FROM technologies t
+LEFT JOIN research_opportunities ro ON t.opportunity_id = ro.id
+WHERE t.source_type = 'researched';
+```
+
+**Get research execution history for debugging:**
+```sql
+SELECT ro.name, re.execution_status, re.subagent_response, re.error_message
+FROM research_executions re
+JOIN research_opportunities ro ON re.opportunity_id = ro.id
+ORDER BY re.started_at DESC;
+```
+
 ## 🚀 Future Extensions
 
 ### Schema Evolution
 The SQLite schema supports easy extension:
 - **New tables**: Add feature-specific data
 - **New columns**: Extend existing entities
-- **Schema updates**: Automated schema versioning
-- **Version tracking**: Database schema version management
+- **No migration needed**: DB created fresh per project
+- **Version tracking**: Schema version in project_metadata
+
+### Schema Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | Initial | Core tables: milestones, tasks, technologies, etc. |
+| 2.0.0 | 2024-12-30 | Research tables: research_opportunities, research_executions; Extended technologies and technology_sources |
 
 ### Potential Enhancements
 1. **Full-text search**: SQLite FTS for task/milestone search

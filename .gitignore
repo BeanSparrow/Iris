@@ -57,3 +57,6 @@ htmlcov/
 
 # mypy
 .mypy_cache/
+
+# Development Files
+dev_docs/
