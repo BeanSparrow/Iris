@@ -63,6 +63,24 @@ Gustav applies the same enterprise-grade process to all projects. Iris analyzes 
 | LARGE | 5-10 | Comprehensive | 5-10 | Comprehensive |
 | ENTERPRISE | 7-15 | Exhaustive | 8-15 | Full suite |
 
+### Ralph Wiggum Refinement Loop
+Iris implements a "Ralph Wiggum" style iterative refinement phase after the main development loop. Named after the [Ralph Wiggum technique](https://ghuntley.com/ralph/), this phase runs parallel review agents with fresh context, followed by a single refiner agent that improves the implementation toward better PRD alignment.
+
+Key principles:
+- **Fixed iterations** (minimum 5): The loop runs a deterministic number of times, never exits early
+- **Fresh context**: Each iteration uses new subagents without accumulated context baggage
+- **Progress in files**: Improvements are committed to git; state persists in database
+- **Improve, not fix**: Focus on enhancement toward PRD intent, not just bug repair
+- **PRD anchoring**: The refiner receives the full PRD each iteration to maintain alignment
+
+| Complexity | Iterations | Reviewers | Focus Areas |
+|------------|------------|-----------|-------------|
+| MICRO | 5 | 2 | gaps, quality |
+| SMALL | 5 | 3 | gaps, quality, edge_cases |
+| MEDIUM | 6 | 4 | gaps, quality, integration, edge_cases |
+| LARGE | 8 | 5 | + security |
+| ENTERPRISE | 10 | 6 | + performance |
+
 ## Installation
 
 Clone or copy the `.claude/commands/iris` directory to your project:
@@ -84,6 +102,7 @@ cp -r /path/to/iris ~/.claude/commands/
 | `/iris:plan <PRD>` | Generate sprint plan (used internally by autopilot) |
 | `/iris:execute [task-id]` | Execute tasks (used internally by autopilot) |
 | `/iris:validate [milestone]` | Validate milestone (used internally by autopilot) |
+| `/iris:refine` | Ralph-style iterative refinement loop (5-10 iterations) |
 | `/iris:document [flags]` | Generate/update documentation (README, status, completion report) |
 | `/iris:audit [scope]` | Security analysis |
 | `/iris:help` | Display help information |
@@ -100,20 +119,25 @@ This requires the permissions flag. See [Permission Setup](#permission-setup).
 
 ### Development Loop
 
-Autopilot executes a 4-phase loop for each milestone:
+Autopilot executes a 5-phase workflow:
 
 ```
 Plan → Execute → Validate → Document
          ↑________________________↓
               (per milestone)
+                    │
+                    ▼
+         Validate → Refine → Document
+                   (loop)    (final)
 ```
 
 1. **Plan** - Analyze PRD, create milestones and tasks
 2. **Execute** - Implement tasks with TDD methodology
 3. **Validate** - Verify milestone completion, run tests
 4. **Document** - Update README.md, PROJECT_STATUS.md
+5. **Refine** - Ralph Wiggum-style iterative improvement (5-10 iterations)
 
-On final completion, Iris generates a `COMPLETION_REPORT.md` with KPIs (total time, tasks completed, validation rate, errors recovered).
+On final completion, Iris generates a `COMPLETION_REPORT.md` with KPIs (total time, tasks completed, validation rate, errors recovered, refine iterations).
 
 ### Debugging Mode
 
@@ -226,22 +250,24 @@ Iris uses prose-orchestration: each `.md` file contains natural language instruc
 
 ```
 .claude/commands/iris/
-├── autopilot.md              # Autonomous orchestrator (invokes plan → execute → validate → document)
+├── autopilot.md              # Autonomous orchestrator (invokes plan → execute → validate → refine → document)
 ├── plan.md                   # Sprint planning (invokes research.md inline)
 ├── research.md               # Technology research (3-phase: foundation → parallel → reconciliation)
 ├── execute.md                # Task execution with TDD
 ├── validate.md               # Milestone validation
+├── refine.md                 # Ralph Wiggum-style iterative refinement
 ├── document.md               # Documentation generation
 ├── audit.md                  # Security analysis
 ├── help.md                   # Help documentation
 └── utils/
     ├── database/
     │   ├── db_manager.py     # Database operations (shared by all modules)
-    │   ├── schema.sql        # Table definitions (v2.0.0)
+    │   ├── schema.sql        # Table definitions (v2.1.0)
     │   └── backup_manager.py # Backup/restore
     ├── autopilot_init.py     # Autopilot initialization
-    ├── iris_adaptive.py      # Complexity analysis
+    ├── iris_adaptive.py      # Complexity analysis + refine config
     ├── executor_cli.py       # Task management CLI
+    ├── refine_orchestrator.py  # Refine phase management
     ├── autonomous_validator.py # Validation system
     ├── document_generator.py   # README, status, and completion reports
     └── [other utilities]

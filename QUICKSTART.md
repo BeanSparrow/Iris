@@ -79,9 +79,15 @@ Ctrl+C
    - Adaptive validation based on project scale
    - Live documentation via Status Translator
 
-3. **Completion Phase**
+3. **Refinement Phase** (Ralph Wiggum Loop)
+   - 5-10 iterations of review → refine → validate
+   - Parallel review agents identify improvement opportunities
+   - Single refiner agent improves code toward PRD alignment
+   - Fresh context each iteration for unbiased assessment
+
+4. **Completion Phase**
    - Final validation checks
-   - Generate completion report
+   - Generate completion report with KPIs
    - Application ready for review
 
 ## Troubleshooting
@@ -119,6 +125,8 @@ export IRIS_MANUAL_MODE=true
 /iris:plan "Your requirements"     # Plan step
 /iris:execute                      # Execute tasks (stops on errors)
 /iris:validate                     # Validate milestone
+/iris:refine                       # Run refinement loop
+/iris:document --final             # Generate final docs
 ```
 
 ## Tips

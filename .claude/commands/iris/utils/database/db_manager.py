@@ -17,16 +17,28 @@ from contextlib import contextmanager
 
 class DatabaseManager:
     """Manages SQLite database for IRIS project state"""
-    
-    def __init__(self, db_path: Optional[str] = None):
-        if db_path is None:
-            # Auto-detect project root and use standard location
-            self.project_root = self._find_project_root()
-            self.tasks_dir = self.project_root / ".tasks"
-            self.db_path = self.tasks_dir / "iris_project.db"
+
+    def __init__(self, project_root: Optional[str] = None):
+        """
+        Initialize DatabaseManager.
+
+        Args:
+            project_root: Optional path to project root. If not provided, checks:
+                         1. IRIS_PROJECT_ROOT environment variable
+                         2. Auto-detection via _find_project_root()
+        """
+        if project_root is not None:
+            # Explicit project root provided
+            self.project_root = Path(project_root)
+        elif os.environ.get('IRIS_PROJECT_ROOT'):
+            # Use environment variable (set by autopilot)
+            self.project_root = Path(os.environ['IRIS_PROJECT_ROOT'])
         else:
-            self.db_path = Path(db_path)
-            self.tasks_dir = self.db_path.parent
+            # Auto-detect project root (fallback)
+            self.project_root = self._find_project_root()
+
+        self.tasks_dir = self.project_root / ".tasks"
+        self.db_path = self.tasks_dir / "iris_project.db"
         
         # Ensure tasks directory exists
         self.tasks_dir.mkdir(exist_ok=True)
@@ -178,7 +190,9 @@ class DatabaseManager:
                     'project_metrics', 'project_state', 'task_executions',
                     'milestone_validations',
                     # Research tables (added in schema 2.0.0)
-                    'research_opportunities', 'research_executions'
+                    'research_opportunities', 'research_executions',
+                    # Refine tables (added in schema 2.1.0)
+                    'refine_iterations', 'refine_findings', 'refine_improvements'
                 ]
                 
                 for table in required_tables:

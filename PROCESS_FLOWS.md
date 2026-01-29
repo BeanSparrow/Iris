@@ -14,9 +14,10 @@ This document provides visual process flows for each IRIS command, showing expec
 4. [Research Module Flow](#research-module-flow)
 5. [/iris:execute Flow](#irisexecute-flow)
 6. [/iris:validate Flow](#irisvalidate-flow)
-7. [/iris:document Flow](#irisdocument-flow)
-8. [/iris:audit Flow](#irisaudit-flow)
-9. [Database State Transitions](#database-state-transitions)
+7. [/iris:refine Flow](#irisrefine-flow)
+8. [/iris:document Flow](#irisdocument-flow)
+9. [/iris:audit Flow](#irisaudit-flow)
+10. [Database State Transitions](#database-state-transitions)
 
 ---
 
@@ -36,17 +37,18 @@ This document provides visual process flows for each IRIS command, showing expec
 │       ┌───────────────────────┼───────────────────────┐                     │
 │       │                       │                       │                     │
 │       ▼                       ▼                       ▼                     │
-│   ┌─────────┐   ┌─────────┐   ┌──────────┐   ┌──────────┐                   │
-│   │  plan   │──▶│ execute │──▶│ validate │──▶│ document │                   │
-│   │(Phase 1)│   │(Phase 2)│   │(Phase 3) │   │(Phase 4) │                   │
-│   └────┬────┘   └────┬────┘   └──────────┘   └────┬─────┘                   │
-│        │             │                            │                         │
-│        │             │◀───────────────────────────┘                         │
-│        │             │     (loop per milestone)                             │
+│   ┌─────────┐   ┌─────────┐   ┌──────────┐   ┌────────┐   ┌──────────┐     │
+│   │  plan   │──▶│ execute │──▶│ validate │──▶│ refine │──▶│ document │     │
+│   │(Phase 1)│   │(Phase 2)│   │(Phase 3) │   │(Ph 3.5)│   │(Phase 4) │     │
+│   └────┬────┘   └────┬────┘   └──────────┘   └────────┘   └────┬─────┘     │
+│        │             │                                         │           │
+│        │             │◀────────────────────────────────────────┘           │
+│        │             │     (loop per milestone until all complete)         │
 │        │             ▼                                                      │
-│        │         ┌────────┐                                                 │
-│        │         │  DONE  │                                                 │
-│        │         └────────┘                                                 │
+│        │         ┌────────────────────────────┐                             │
+│        │         │ Final: validate → refine → │                             │
+│        │         │        document (KPIs)     │                             │
+│        │         └────────────────────────────┘                             │
 │        │                                                                    │
 │        │   PROSE-ORCHESTRATION (inline execution)                           │
 │        │   ┌─────────────────────────────────────────────┐                  │
@@ -58,10 +60,10 @@ This document provides visual process flows for each IRIS command, showing expec
 │   │                     STANDALONE COMMANDS                           │     │
 │   ├───────────────────────────────────────────────────────────────────┤     │
 │   │                                                                   │     │
-│   │  ┌───────────────────────────┐  ┌───────────────────────────┐    │     │
-│   │  │     /iris:document       │  │       /iris:audit         │    │     │
-│   │  │      (Standalone)        │  │       (Security)          │    │     │
-│   │  └───────────────────────────┘  └───────────────────────────┘    │     │
+│   │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐   │     │
+│   │  │  /iris:refine   │  │ /iris:document  │  │   /iris:audit   │   │     │
+│   │  │  (Ralph Loop)   │  │  (Standalone)   │  │   (Security)    │   │     │
+│   │  └─────────────────┘  └─────────────────┘  └─────────────────┘   │     │
 │   │                                                                   │     │
 │   │                           │                                       │     │
 │   │                           ▼                                       │     │
@@ -218,13 +220,46 @@ This document provides visual process flows for each IRIS command, showing expec
 │   │  Invoke /iris:validate                                              │   │
 │   │  (See /iris:validate flow below)                                   │   │
 │   └─────────────────────────────────────────────────────────────────────┘   │
-│                                    │                                        │
-│                                    ▼                                        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│               PHASE 3.5: RALPH-STYLE REFINEMENT LOOP                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
 │   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  Generate Completion Summary                                        │   │
-│   │  ├── Total tasks completed                                         │   │
-│   │  ├── Milestones completed                                          │   │
-│   │  ├── Total execution time                                          │   │
+│   │  Execute refine.md inline (prose-orchestration)                     │   │
+│   │  OR invoke /iris:refine                                             │   │
+│   │  (See Refine Module Flow below)                                     │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Fixed Iterations (5-10 based on complexity)                        │   │
+│   │  ├── Parallel review subagents (fresh context, read-only)          │   │
+│   │  ├── Aggregate findings by severity                                │   │
+│   │  ├── Single refiner subagent (fresh context, write access)         │   │
+│   │  ├── Validate (backpressure, not termination gate)                 │   │
+│   │  └── Repeat for all iterations (never exit early)                  │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 4: FINAL DOCUMENTATION                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Gate Check: Verify refine_phase_status == 'completed'             │   │
+│   │  (Warns if skipped, proceeds with empty refine metrics)            │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Generate Final Documentation                                       │   │
+│   │  ├── Update README.md                                              │   │
+│   │  ├── Update PROJECT_STATUS.md                                      │   │
+│   │  ├── Generate COMPLETION_REPORT.md with KPIs                       │   │
 │   │  └── Store autopilot_completed timestamp                           │   │
 │   └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
@@ -242,9 +277,11 @@ This document provides visual process flows for each IRIS command, showing expec
 | Artifact | Description |
 |----------|-------------|
 | `.tasks/iris_project.db` | Complete project state in SQLite |
+| `README.md` | Auto-generated project documentation |
 | `PROJECT_STATUS.md` | Human-readable progress report |
+| `COMPLETION_REPORT.md` | Final KPIs and metrics |
 | `.tasks/backups/` | Automatic database backups |
-| Application code | Fully implemented project |
+| Application code | Fully implemented and refined project |
 
 ---
 
@@ -1318,6 +1355,171 @@ This document provides visual process flows for each IRIS command, showing expec
 | `.tasks/auth_analysis.log` | Authentication review |
 | `.tasks/owasp_check.log` | OWASP validation |
 | `.tasks/zerotrust_review.log` | ZTA pattern analysis |
+
+---
+
+## /iris:refine Flow
+
+**Purpose:** Ralph Wiggum-style iterative refinement to improve implementation toward PRD alignment.
+
+**Invocation:**
+- **Standalone:** `/iris:refine` - Run refinement on an existing project
+- **Via Autopilot:** Executed inline as Phase 3.5 of `/iris:autopilot`
+
+**Input:** Existing project with completed tasks in database
+**Output:** Improved codebase with refine_phase_status='completed'
+
+**Philosophy:** The Ralph Wiggum technique - fixed iterations with fresh context for progressive improvement.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         REFINE MODULE FLOW                                  │
+│                    (Ralph Wiggum-Style Iteration)                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      PHASE 0: INITIALIZATION                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌───────────────────────────────────────────────────────────────────┐     │
+│   │  Load Configuration from Database                                 │     │
+│   │  ├── Get complexity level                                         │     │
+│   │  ├── Determine max_iterations (minimum 5)                         │     │
+│   │  ├── Determine reviewer count (2-6 by complexity)                 │     │
+│   │  └── Get review focus areas                                       │     │
+│   └───────────────────────────────────────────────────────────────────┘     │
+│                                   │                                         │
+│   ┌───────────────────────────────────────────────────────────────────┐     │
+│   │  Load Context                                                     │     │
+│   │  ├── Retrieve PRD content (for refiner anchoring)                 │     │
+│   │  ├── Load tech stack constraints                                  │     │
+│   │  └── Initialize refine state in database                          │     │
+│   └───────────────────────────────────────────────────────────────────┘     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│              PHASE 1: ITERATION LOOP (Fixed Count - Never Exit Early)       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   for iteration in range(1, max_iterations + 1):                            │
+│                                                                             │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  PHASE 1A: REVIEW (Parallel Fresh Subagents)                       │   │
+│   │                                                                     │   │
+│   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌───────────┐  │   │
+│   │  │   Gaps      │  │  Quality    │  │ Integration │  │Edge Cases │  │   │
+│   │  │  Reviewer   │  │  Reviewer   │  │  Reviewer   │  │ Reviewer  │  │   │
+│   │  │  (fresh)    │  │  (fresh)    │  │  (fresh)    │  │ (fresh)   │  │   │
+│   │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └─────┬─────┘  │   │
+│   │         │                │                │               │        │   │
+│   │         └────────────────┴────────────────┴───────────────┘        │   │
+│   │                                   │                                 │   │
+│   │                                   ▼                                 │   │
+│   │                        [Findings JSON]                              │   │
+│   │                                                                     │   │
+│   │  Note: Reviewers are READ-ONLY (prompt-constrained)                 │   │
+│   │  Focus areas scale with complexity (2-6 reviewers)                  │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                   │                                         │
+│                                   ▼                                         │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  PHASE 1B: AGGREGATE                                                │   │
+│   │                                                                     │   │
+│   │  ├── Combine findings from all reviewers                           │   │
+│   │  ├── Prioritize by: Severity → PRD alignment → File locality       │   │
+│   │  └── Store findings in database                                    │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                   │                                         │
+│                                   ▼                                         │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  PHASE 1C: REFINE (Single Fresh Subagent)                          │   │
+│   │                                                                     │   │
+│   │                  ┌─────────────────────────┐                        │   │
+│   │                  │      Refiner Agent      │                        │   │
+│   │                  │        (fresh)          │                        │   │
+│   │                  │                         │                        │   │
+│   │  Receives:       │  ┌─────────────────┐    │                        │   │
+│   │  • PRD (full)    │  │  Improve code   │    │                        │   │
+│   │  • Tech stack    │  │  Run tests      │    │                        │   │
+│   │  • Findings      │  │  Commit changes │    │                        │   │
+│   │                  │  └─────────────────┘    │                        │   │
+│   │                  └─────────────────────────┘                        │   │
+│   │                                                                     │   │
+│   │  Key: "IMPROVE, not just fix" - enhance toward PRD intent           │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                   │                                         │
+│                                   ▼                                         │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  PHASE 1D: VALIDATE (Backpressure)                                  │   │
+│   │                                                                     │   │
+│   │  ├── Run test suite                                                │   │
+│   │  ├── Record pass/fail                                              │   │
+│   │  └── Continue regardless (validation is backpressure, not a gate)  │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                   │                                         │
+│                                   ▼                                         │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  PHASE 1E: RECORD & CONTINUE                                        │   │
+│   │                                                                     │   │
+│   │  ├── Update iteration counter in database                          │   │
+│   │  ├── Output iteration summary                                      │   │
+│   │  └── Continue to next iteration (NEVER exit early)                 │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                   │                                         │
+│                                   │                                         │
+│                           (loop back to 1A)                                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      PHASE 2: COMPLETION                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌───────────────────────────────────────────────────────────────────┐     │
+│   │  After ALL iterations complete:                                   │     │
+│   │  ├── Run final validation (tests, lint, build)                    │     │
+│   │  ├── Generate refine summary report                               │     │
+│   │  ├── Update refine_phase_status = 'completed'                     │     │
+│   │  └── Return control to autopilot.md                               │     │
+│   └───────────────────────────────────────────────────────────────────┘     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Configuration by Complexity
+
+| Complexity | Max Iterations | Reviewers | Focus Areas |
+|------------|----------------|-----------|-------------|
+| MICRO | 5 | 2 | gaps, quality |
+| SMALL | 5 | 3 | gaps, quality, edge_cases |
+| MEDIUM | 6 | 4 | gaps, quality, integration, edge_cases |
+| LARGE | 8 | 5 | gaps, quality, integration, edge_cases, security |
+| ENTERPRISE | 10 | 6 | gaps, quality, integration, edge_cases, security, performance |
+
+### Key Ralph Wiggum Principles
+
+| Principle | Implementation |
+|-----------|----------------|
+| Fresh Context | Each iteration uses new subagents without accumulated baggage |
+| Progress in Files | Improvements committed to git; state in database |
+| Fixed Iterations | Loop runs exactly max_iterations times (minimum 5) |
+| Improve, Not Fix | Focus on enhancement toward PRD intent, not just bug repair |
+| PRD Anchoring | Refiner receives full PRD each iteration |
+| Backpressure | Validation provides feedback but doesn't terminate loop |
+
+### Database Tables Used
+
+| Table | Purpose |
+|-------|---------|
+| `refine_iterations` | Tracks each iteration's status, findings count, improvements |
+| `refine_findings` | Stores findings from review agents |
+| `refine_improvements` | Records improvements made by refiner |
+| `project_state` | Tracks refine_phase_status, current_iteration |
+| `project_metadata` | Stores PRD content, timestamps |
 
 ---
 

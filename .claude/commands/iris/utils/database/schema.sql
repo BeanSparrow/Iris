@@ -1,6 +1,12 @@
 -- Iris Project Database Schema
 -- Replaces JSON-based project tracking with SQLite relational database
--- Version: 2.0.0
+-- Version: 2.1.0
+--
+-- Changes in 2.1.0:
+--   - Added refine_iterations table for Ralph-style refinement loop tracking
+--   - Added refine_findings table for review agent findings
+--   - Added refine_improvements table for refiner agent improvements
+--   - Added indexes for refine tables
 --
 -- Changes in 2.0.0:
 --   - Added research_opportunities table for dynamic research tracking
@@ -212,9 +218,67 @@ CREATE INDEX IF NOT EXISTS idx_research_opp_category ON research_opportunities(c
 CREATE INDEX IF NOT EXISTS idx_tech_opportunity ON technologies(opportunity_id);
 CREATE INDEX IF NOT EXISTS idx_research_exec_opp ON research_executions(opportunity_id);
 
+-- ============================================================================
+-- RALPH REFINER TABLES (added in 2.1.0)
+-- Implements Ralph Wiggum-style iterative refinement loop
+-- ============================================================================
+
+-- Refine iterations - tracks each pass through the refinement loop
+CREATE TABLE IF NOT EXISTS refine_iterations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    iteration_number INTEGER NOT NULL,
+    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed_at DATETIME,
+    findings_count INTEGER DEFAULT 0,
+    improvements_count INTEGER DEFAULT 0,
+    validation_passed BOOLEAN,
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending, in_progress, completed
+    summary TEXT                              -- Brief summary of iteration outcome
+);
+
+-- Refine findings - stores findings from parallel review agents
+CREATE TABLE IF NOT EXISTS refine_findings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    iteration_id INTEGER NOT NULL,
+    reviewer_focus TEXT NOT NULL,             -- gaps, quality, integration, edge_cases, security, performance
+    severity TEXT NOT NULL,                   -- HIGH, MEDIUM, LOW
+    category TEXT NOT NULL,                   -- gap, quality, integration, edge_case, security, performance
+    file_path TEXT,
+    line_number INTEGER,
+    description TEXT NOT NULL,
+    suggestion TEXT,
+    prd_reference TEXT,                       -- Which PRD requirement this relates to
+    addressed BOOLEAN DEFAULT FALSE,
+    addressed_in_iteration INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (iteration_id) REFERENCES refine_iterations(id) ON DELETE CASCADE
+);
+
+-- Refine improvements - tracks improvements made by refiner agent
+CREATE TABLE IF NOT EXISTS refine_improvements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    iteration_id INTEGER NOT NULL,
+    finding_id INTEGER,                       -- Links to finding that prompted this (nullable for proactive improvements)
+    description TEXT NOT NULL,
+    files_modified TEXT,                      -- JSON array of file paths
+    commit_hash TEXT,
+    tests_passing BOOLEAN,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (iteration_id) REFERENCES refine_iterations(id) ON DELETE CASCADE,
+    FOREIGN KEY (finding_id) REFERENCES refine_findings(id) ON DELETE SET NULL
+);
+
+-- Refine-related indexes
+CREATE INDEX IF NOT EXISTS idx_refine_iterations_status ON refine_iterations(status);
+CREATE INDEX IF NOT EXISTS idx_refine_findings_iteration ON refine_findings(iteration_id);
+CREATE INDEX IF NOT EXISTS idx_refine_findings_severity ON refine_findings(severity);
+CREATE INDEX IF NOT EXISTS idx_refine_findings_addressed ON refine_findings(addressed);
+CREATE INDEX IF NOT EXISTS idx_refine_improvements_iteration ON refine_improvements(iteration_id);
+CREATE INDEX IF NOT EXISTS idx_refine_improvements_finding ON refine_improvements(finding_id);
+
 -- Schema version tracking
 INSERT OR REPLACE INTO project_metadata (key, value)
-VALUES ('schema_version', '2.0.0');
+VALUES ('schema_version', '2.1.0');
 
 INSERT OR REPLACE INTO project_metadata (key, value) 
 VALUES ('database_created', datetime('now'));
@@ -229,5 +293,18 @@ VALUES ('total_tasks', '0');
 INSERT OR REPLACE INTO project_state (key, value) 
 VALUES ('completed_tasks', '0');
 
-INSERT OR REPLACE INTO project_state (key, value) 
+INSERT OR REPLACE INTO project_state (key, value)
 VALUES ('project_status', 'initialized');
+
+-- Default refine state values (added in 2.1.0)
+INSERT OR REPLACE INTO project_state (key, value)
+VALUES ('refine_enabled', 'true');
+
+INSERT OR REPLACE INTO project_state (key, value)
+VALUES ('refine_phase_status', 'pending');
+
+INSERT OR REPLACE INTO project_state (key, value)
+VALUES ('refine_current_iteration', '0');
+
+INSERT OR REPLACE INTO project_state (key, value)
+VALUES ('refine_max_iterations', '5');

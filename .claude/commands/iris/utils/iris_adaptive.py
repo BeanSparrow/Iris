@@ -3,7 +3,12 @@
 Iris Adaptive Framework - Dynamic complexity-based adjustments
 Analyzes project requirements and scales framework complexity accordingly
 
-Version: 2.0.0
+Version: 2.1.0
+Changes in 2.1.0:
+  - Added RefineConfig for Ralph Wiggum-style iterative refinement
+  - Added refine_max_iterations, refine_reviewer_count to AdaptiveConfig
+  - Minimum 5 iterations for refine phase (Ralph philosophy)
+
 Changes in 2.0.0:
   - Removed ResearchOrchestrator class (research now handled by research.md)
   - Removed research_agents_count, skip_common_research from AdaptiveConfig
@@ -12,7 +17,7 @@ Changes in 2.0.0:
 
 import json
 import re
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -55,12 +60,19 @@ class AdaptiveConfig:
     require_validation_pause: bool = field(init=False)
     documentation_level: str = field(init=False)  # "minimal", "standard", "comprehensive"
 
+    # Refine configuration (Ralph Wiggum-style iterative improvement)
+    # Minimum 5 iterations to honor Ralph philosophy
+    refine_max_iterations: int = field(init=False)
+    refine_reviewer_count: int = field(init=False)
+    refine_focus_areas: List[str] = field(init=False)
+
     # Note: Research configuration is now handled dynamically by research.md
     # based on PRD analysis, not fixed counts per complexity level
 
     def __post_init__(self):
         """Set configuration based on complexity and type"""
         self._configure_by_complexity()
+        self._configure_refine()
         self._adjust_for_project_type()
     
     def _configure_by_complexity(self):
@@ -122,7 +134,45 @@ class AdaptiveConfig:
         config = configs[self.complexity]
         for key, value in config.items():
             setattr(self, key, value)
-    
+
+    def _configure_refine(self):
+        """Configure Ralph Wiggum-style refine phase based on complexity
+
+        Key principle: Minimum 5 iterations to honor Ralph philosophy.
+        The loop must run a fixed number of times - no early termination.
+        """
+        refine_configs = {
+            ProjectComplexity.MICRO: {
+                "refine_max_iterations": 5,  # Minimum for Ralph philosophy
+                "refine_reviewer_count": 2,
+                "refine_focus_areas": ["gaps", "quality"]
+            },
+            ProjectComplexity.SMALL: {
+                "refine_max_iterations": 5,  # Minimum for Ralph philosophy
+                "refine_reviewer_count": 3,
+                "refine_focus_areas": ["gaps", "quality", "edge_cases"]
+            },
+            ProjectComplexity.MEDIUM: {
+                "refine_max_iterations": 6,
+                "refine_reviewer_count": 4,
+                "refine_focus_areas": ["gaps", "quality", "integration", "edge_cases"]
+            },
+            ProjectComplexity.LARGE: {
+                "refine_max_iterations": 8,
+                "refine_reviewer_count": 5,
+                "refine_focus_areas": ["gaps", "quality", "integration", "edge_cases", "security"]
+            },
+            ProjectComplexity.ENTERPRISE: {
+                "refine_max_iterations": 10,
+                "refine_reviewer_count": 6,
+                "refine_focus_areas": ["gaps", "quality", "integration", "edge_cases", "security", "performance"]
+            }
+        }
+
+        config = refine_configs[self.complexity]
+        for key, value in config.items():
+            setattr(self, key, value)
+
     def _adjust_for_project_type(self):
         """Fine-tune configuration based on project type"""
         # Note: Research adjustments removed - now handled dynamically by research.md
@@ -469,6 +519,9 @@ def main():
     print(f"Tasks per Milestone: {config_micro.tasks_per_milestone}")
     print(f"TDD Required: {config_micro.enforce_tdd}")
     print(f"Research: Dynamic (handled by research.md)")
+    print(f"Refine Iterations: {config_micro.refine_max_iterations}")
+    print(f"Refine Reviewers: {config_micro.refine_reviewer_count}")
+    print(f"Refine Focus: {', '.join(config_micro.refine_focus_areas)}")
 
     # Analyze large project
     print("\n" + "=" * 60)
@@ -481,6 +534,9 @@ def main():
     print(f"Tasks per Milestone: {config_large.tasks_per_milestone}")
     print(f"TDD Required: {config_large.enforce_tdd}")
     print(f"Research: Dynamic (handled by research.md)")
+    print(f"Refine Iterations: {config_large.refine_max_iterations}")
+    print(f"Refine Reviewers: {config_large.refine_reviewer_count}")
+    print(f"Refine Focus: {', '.join(config_large.refine_focus_areas)}")
 
     print("\n" + "=" * 60)
     print("RESEARCH NOTE")
@@ -490,6 +546,16 @@ def main():
     print("- Parallel subagents perform actual web research")
     print("- Results stored with confidence levels")
     print("See: .claude/commands/iris/research.md")
+
+    print("\n" + "=" * 60)
+    print("REFINE NOTE (Ralph Wiggum Philosophy)")
+    print("=" * 60)
+    print("Refine phase implements Ralph Wiggum-style iteration:")
+    print("- Minimum 5 iterations (never exit early)")
+    print("- Parallel review agents with fresh context")
+    print("- Single refiner agent receives PRD each iteration")
+    print("- Progress persists in files/git, not context")
+    print("See: .claude/commands/iris/refine.md")
 
 if __name__ == "__main__":
     main()

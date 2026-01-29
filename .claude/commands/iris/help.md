@@ -28,6 +28,7 @@ IRIS transforms ideas into working applications autonomously. Provide requiremen
 /iris:plan <PRD>           - Manual sprint planning
 /iris:execute [task-id]    - Manual task execution
 /iris:validate [milestone] - Manual milestone validation
+/iris:refine               - Ralph-style iterative refinement
 /iris:document [flags]     - Generate/update documentation
 /iris:audit [scope]        - Essential security analysis
 
@@ -43,8 +44,9 @@ IRIS transforms ideas into working applications autonomously. Provide requiremen
 1. Plan: /iris:plan "Your requirements"
 2. Execute: /iris:execute
 3. Validate: /iris:validate
-4. Document: /iris:document
-5. Audit: /iris:audit
+4. Refine: /iris:refine (Ralph-style improvement loop)
+5. Document: /iris:document
+6. Audit: /iris:audit
 
 ## 📚 Document Command Flags
 
@@ -63,5 +65,21 @@ IRIS uses dynamic, PRD-driven research with prose-orchestration:
 
 Research output: TECH_DECISIONS.md (technology choices with rationale)
 
-IRIS uses adaptive complexity scaling, prose-orchestration, and dynamic research to deliver prototypes autonomously.
+## 🔄 How Refinement Works (Ralph Wiggum Philosophy)
+
+After development, IRIS runs iterative refinement loops:
+
+1. Review       - Parallel subagents analyze code with fresh context
+2. Aggregate    - Combine findings, prioritize by severity
+3. Refine       - Single subagent improves code toward PRD intent
+4. Validate     - Run tests (backpressure, not a gate)
+5. Repeat       - Fixed iterations (5-10 based on complexity)
+
+Key principles:
+- Fresh context each iteration (no accumulated baggage)
+- Progress persists in files/git, not context
+- "Improve, not just fix" - enhance toward PRD intent
+- Never exit early - run all iterations
+
+IRIS uses adaptive complexity scaling, prose-orchestration, dynamic research, and Ralph Wiggum refinement to deliver quality prototypes autonomously.
 ```

@@ -461,9 +461,77 @@ echo "────────────────────────�
 
 Now invoke `/iris:validate` to run the final validation checks.
 
+## 🔄 Phase 3.5: Ralph-Style Refinement Loop
+
+**After validation, run iterative refinement to improve the implementation.**
+
+This phase implements the Ralph Wiggum methodology: fixed iterations with fresh context for progressive improvement toward PRD alignment.
+
+```bash
+echo ""
+echo "────────────────────────────────────────────────"
+echo "🔄 Phase 3.5: Ralph-Style Refinement"
+echo "────────────────────────────────────────────────"
+
+# Check if refine is enabled and get configuration
+REFINE_CONFIG=$(cd "$IRIS_DIR/utils" && python3 -c "
+import sys
+sys.path.insert(0, '.')
+from refine_orchestrator import RefineOrchestrator
+
+orchestrator = RefineOrchestrator()
+config = orchestrator.get_config()
+print(f'{config.max_iterations}:{config.reviewer_count}:{config.complexity}')
+print(','.join(config.review_focus_areas))
+")
+
+IFS=':' read -r MAX_ITERATIONS REVIEWER_COUNT COMPLEXITY <<< "$(echo "$REFINE_CONFIG" | head -1)"
+FOCUS_AREAS=$(echo "$REFINE_CONFIG" | tail -1)
+
+echo "🔧 Refine Configuration:"
+echo "   Complexity: $COMPLEXITY"
+echo "   Iterations: $MAX_ITERATIONS (minimum 5 for Ralph philosophy)"
+echo "   Reviewers: $REVIEWER_COUNT"
+echo "   Focus Areas: $FOCUS_AREAS"
+echo ""
+```
+
+**CRITICAL:** Use the Read tool to read the file at `$IRIS_DIR/refine.md`, then execute its instructions inline to perform iterative refinement.
+
+The refine phase will:
+1. Run `$MAX_ITERATIONS` iterations (never exit early)
+2. Each iteration: parallel review agents → aggregate findings → single refiner agent
+3. Refiner receives the original PRD each iteration to maintain alignment
+4. Improvements are committed to git; progress persists in database
+
+**After refine.md completes, verify the refine phase finished:**
+
+```bash
+# Verify refine phase completed
+REFINE_STATUS=$(cd "$IRIS_DIR/utils" && python3 -c "
+import sys
+sys.path.insert(0, '.')
+from database.db_manager import DatabaseManager
+
+db = DatabaseManager()
+with db.get_connection() as conn:
+    result = conn.execute(\"SELECT value FROM project_state WHERE key = 'refine_phase_status'\").fetchone()
+    print(result['value'] if result else 'not_started')
+")
+
+if [[ "$REFINE_STATUS" == "completed" ]]; then
+    echo "✅ Refine phase completed successfully"
+else
+    echo "⚠️ Refine phase status: $REFINE_STATUS"
+fi
+echo ""
+```
+
 ## 📚 Phase 4: Final Documentation & Completion Report
 
-After validation completes, generate final documentation with KPIs:
+After refinement completes, generate final documentation with KPIs.
+
+**⚠️ GATE CHECK: Verify refine phase completed before proceeding:**
 
 ```bash
 echo ""
@@ -471,6 +539,37 @@ echo "────────────────────────�
 echo "📚 Phase 4: Final Documentation"
 echo "────────────────────────────────────────────────"
 
+# GATE: Check that refine phase completed
+REFINE_GATE=$(cd "$IRIS_DIR/utils" && python3 -c "
+import sys
+sys.path.insert(0, '.')
+from database.db_manager import DatabaseManager
+
+try:
+    db = DatabaseManager('$PROJECT_ROOT')
+    with db.get_connection() as conn:
+        result = conn.execute(\"SELECT value FROM project_state WHERE key = 'refine_phase_status'\").fetchone()
+        status = result['value'] if result else 'not_started'
+        print(status)
+except Exception as e:
+    print(f'error:{e}')
+")
+
+if [[ "$REFINE_GATE" != "completed" ]]; then
+    echo "⚠️ WARNING: Refine phase status is '$REFINE_GATE'"
+    echo ""
+    echo "The Ralph-style refinement loop (Phase 3.5) should run before final documentation."
+    echo "This ensures the implementation has been iteratively improved."
+    echo ""
+    echo "To run refinement: /iris:refine"
+    echo "Or re-run autopilot to execute the full workflow."
+    echo ""
+    echo "Proceeding with documentation anyway (refine metrics will be empty)..."
+    echo ""
+fi
+```
+
+```bash
 # Mark autopilot as complete in database
 cd "$IRIS_DIR/utils" && python3 -c "
 import sys
@@ -532,7 +631,8 @@ The autopilot follows this flow:
    - On milestone complete: Validate → Document
    - Repeat until all milestones done
 4. **Final Validation** → Invoke `/iris:validate` for final checks
-5. **Final Documentation** → Generate KPIs, update all docs, completion report
+5. **Refinement Loop** → Ralph-style iterative improvement (5-10 iterations)
+6. **Final Documentation** → Generate KPIs, update all docs, completion report
 
 ```
 ┌──────────┐     ┌─────────┐     ┌──────────┐     ┌──────────┐
@@ -542,9 +642,16 @@ The autopilot follows this flow:
                       │◀───────────────────────────────┘
                       │         (next milestone)
                       ▼
-                ┌───────────┐
-                │   DONE    │
-                └───────────┘
+                ┌──────────┐     ┌──────────┐     ┌──────────┐
+                │ VALIDATE │────▶│  REFINE  │────▶│ DOCUMENT │
+                │ (final)  │     │  (loop)  │     │ (final)  │
+                └──────────┘     └────┬─────┘     └──────────┘
+                                      │
+                         ┌────────────┴────────────┐
+                         │   Ralph-Style Loop:     │
+                         │   Review → Refine →     │
+                         │   Validate (×5-10)      │
+                         └─────────────────────────┘
 ```
 
 **KEY DIFFERENCE FROM MANUAL MODE:** In autopilot, YOU (Claude) directly implement each task using your tools. There is no subprocess spawning - you are the executor.

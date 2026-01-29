@@ -145,6 +145,10 @@ from database.db_manager import DatabaseManager
 import json
 from datetime import datetime
 
+# Read PRD content from temp file (created earlier in this script)
+with open('/tmp/prd_analysis.txt', 'r') as f:
+    prd_content = f.read()
+
 config_items = [
     ('analysis_timestamp', datetime.now().isoformat()),
     ('project_complexity', '$COMPLEXITY'),
@@ -155,7 +159,8 @@ config_items = [
     ('validation_frequency', '$VALIDATION_FREQ'),
     ('enforce_tdd', '$ENFORCE_TDD'),
     ('research_mode', 'dynamic'),  # Research opportunities selected dynamically
-    ('scaling_rationale', f'$COMPLEXITY complexity $PROJECT_TYPE project with adaptive scaling')
+    ('scaling_rationale', f'$COMPLEXITY complexity $PROJECT_TYPE project with adaptive scaling'),
+    ('prd_content', prd_content)  # Store PRD for refine phase to access
 ]
 
 db = DatabaseManager()
@@ -164,7 +169,7 @@ with db.get_connection() as conn:
         conn.execute('INSERT OR REPLACE INTO project_metadata (key, value) VALUES (?, ?)', (key, str(value)))
     conn.commit()
 
-print('✅ Configuration stored in database')
+print('✅ Configuration stored in database (including PRD content)')
 "
 ```
 
